@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+crewai
+groq
+yfinance
+python-dotenv
+jinja2
+websockets
+alpha_vantage
+crewai_tools
