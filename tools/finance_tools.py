@@ -5,9 +5,9 @@ from alpha_vantage.timeseries import TimeSeries
 from datetime import datetime
 import os
 import requests
+import re
 from dotenv import load_dotenv
 from typing import Any, Optional
-import json
 
 load_dotenv()
 
@@ -53,7 +53,7 @@ class AlphaVantageTool(BaseTool):
             response = requests.get(base_url, params=params)
             if response.status_code == 200:
                 overview = response.json()
-                if "Name" not in overview:  # Handle case where API returns an error or empty response
+                if "Name" not in overview:
                     return {"error": "No data found for this ticker in Alpha Vantage"}
                 data = {
                     "company_name": overview.get("Name"),
@@ -89,10 +89,10 @@ class SearchCompanyTool(BaseTool):
     name: str = "CompanyInfoSearch"
     description: str = "Searches for additional company information using SerperDevTool."
     
-    serper_tool: Optional[SerperDevTool] = None  # Declare with default None
+    serper_tool: Optional[SerperDevTool] = None
 
     class Config:
-        arbitrary_types_allowed = True  # Allow SerperDevTool
+        arbitrary_types_allowed = True
 
     def __init__(self):
         super().__init__()
@@ -101,12 +101,51 @@ class SearchCompanyTool(BaseTool):
     def _run(self, company_name: str) -> str:
         return self.serper_tool.run(f"{company_name} financial reports inventory data")
 
+class TickerLookupTool(BaseTool):
+    name: str = "TickerLookupTool"
+    description: str = "Looks up a company's ticker symbol based on its name using Serper API."
+
+    def _run(self, company_name: str) -> str:
+        api_key = os.getenv("SERPER_API_KEY")
+        if not api_key:
+            return "Error: SERPER_API_KEY not set in .env file"
+
+        url = "https://google.serper.dev/search"
+        query = f"{company_name} stock ticker symbol"
+        headers = {
+            "X-API-KEY": api_key,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "q": query
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Extract ticker from organic search results
+            search_results = data.get("organic", [])
+            for result in search_results:
+                snippet = result.get("snippet", "")
+                ticker_match = re.search(r'\b[A-Z]{1,5}\b', snippet)
+                if ticker_match:
+                    return ticker_match.group(0)
+            
+            return f"Error: No ticker found for {company_name}"
+        except requests.RequestException as e:
+            return f"Error: API request failed - {str(e)}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
 class FinanceTools:
     def __init__(self):
         self.alpha_vantage_key = os.getenv("ALPHA_VANTAGE_API_KEY")
         self.ts = TimeSeries(key=self.alpha_vantage_key)
-        self.file_read_tool = FileReadTool()
+        # self.file_read_tool = FileReadTool()
         self.yfinance_tool = YFinanceTool()
         self.alpha_vantage_tool = AlphaVantageTool()
         self.inventory_check_tool = InventoryCheckTool()
-        self.search_company_tool = SearchCompanyTool()
+        # self.search_company_tool = SearchCompanyTool()
+        self.ticker_lookup_tool = TickerLookupTool()

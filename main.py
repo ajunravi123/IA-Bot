@@ -19,7 +19,7 @@ finance_tools = FinanceTools()
 
 @app.get("/")
 async def root(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -60,25 +60,30 @@ async def websocket_endpoint(websocket: WebSocket):
                     "content": collector_output
                 })
             else:
-                # Extract JSON from formatter_output if it’s mixed with text
+                # Handle formatter_output (might be string with embedded JSON or invalid escapes)
                 if isinstance(formatter_output, str):
-                    # Use regex to find the JSON object (between { and })
-                    json_match = re.search(r'\{.*\}', formatter_output, re.DOTALL)
+                    # Extract JSON from ```json markers if present
+                    json_match = re.search(r'```json\s*(.*?)\s*```', formatter_output, re.DOTALL)
                     if json_match:
-                        try:
-                            formatted_data = json.loads(json_match.group(0))
-                        except json.JSONDecodeError:
-                            formatted_data = {"error": "Failed to parse formatter output as JSON"}
+                        json_str = json_match.group(1)
                     else:
-                        formatted_data = {"error": "No valid JSON found in formatter output"}
+                        json_str = formatter_output
+                    
+                    # Fix invalid escape sequences (e.g., \\$ to $)
+                    json_str = json_str.replace(r'\\$', '$')
+                    
+                    try:
+                        formatted_data = json.loads(json_str)
+                    except json.JSONDecodeError as e:
+                        formatted_data = {"error": f"Failed to parse formatter output as JSON: {str(e)}"}
                 else:
-                    formatted_data = formatter_output  # Assume it’s already a dict
+                    formatted_data = formatter_output  # Assume it’s a dict
                 
                 await websocket.send_json({
                     "type": "result",
                     "data": {
                         "formatted_data": formatted_data,
-                        "summary": summary_output
+                        "summary": summary_output if isinstance(summary_output, str) else "No summary available"
                     }
                 })
             
