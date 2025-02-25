@@ -6,6 +6,7 @@ from agents import DataCollectorAgent, DataFormatterAgent, SummaryGeneratorAgent
 from tools import FinanceTools
 import json
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +19,7 @@ finance_tools = FinanceTools()
 
 @app.get("/")
 async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -48,9 +49,9 @@ async def websocket_endpoint(websocket: WebSocket):
             result = crew.kickoff()
             
             # Extract task outputs
-            collector_output = result.tasks_output[0].raw  # JSON or string
-            formatter_output = result.tasks_output[1].raw  # JSON
-            summary_output = result.tasks_output[2].raw   # String
+            collector_output = result.tasks_output[0].raw
+            formatter_output = result.tasks_output[1].raw
+            summary_output = result.tasks_output[2].raw
             
             # Handle non-inventory case
             if isinstance(collector_output, str) and "inventory-based" in collector_output:
@@ -59,11 +60,19 @@ async def websocket_endpoint(websocket: WebSocket):
                     "content": collector_output
                 })
             else:
-                # Ensure formatter_output is a dict
-                try:
-                    formatted_data = json.loads(formatter_output) if isinstance(formatter_output, str) else formatter_output
-                except json.JSONDecodeError:
-                    formatted_data = {"error": "Failed to format data"}
+                # Extract JSON from formatter_output if it’s mixed with text
+                if isinstance(formatter_output, str):
+                    # Use regex to find the JSON object (between { and })
+                    json_match = re.search(r'\{.*\}', formatter_output, re.DOTALL)
+                    if json_match:
+                        try:
+                            formatted_data = json.loads(json_match.group(0))
+                        except json.JSONDecodeError:
+                            formatted_data = {"error": "Failed to parse formatter output as JSON"}
+                    else:
+                        formatted_data = {"error": "No valid JSON found in formatter output"}
+                else:
+                    formatted_data = formatter_output  # Assume it’s already a dict
                 
                 await websocket.send_json({
                     "type": "result",
