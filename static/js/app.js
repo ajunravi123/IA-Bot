@@ -6,6 +6,15 @@ socket.onmessage = function(event) {
     
     switch(data.type) {
         case "thinking":
+            $(".thinking-animation").remove();
+            chatMessages.append(`
+                <div class="thinking-animation">
+                    <div class="thinking-spinner"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                </div>
+            `);
             break;
         case "question":
             chatMessages.append(`<div class="message bot-message fade-in">${data.message}</div>`);
@@ -32,7 +41,6 @@ function sendMessage() {
     if (message) {
         chatMessages.append(`<div class="message user-message fade-in">${message}</div>`);
         socket.send(message);
-        // Show thinking animation on submit
         chatMessages.append(`
             <div class="thinking-animation">
                 <div class="thinking-spinner"></div>
@@ -50,31 +58,32 @@ function renderResults(data) {
     let table = '';
     let summary = '';
 
-    if (data.data && data.data.formatted_data && typeof data.data.formatted_data === 'object') {
+    // Check if benefits data is present and render as table
+    if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
         table = `
             <table class="table table-dark table-striped mt-3">
                 <thead>
                     <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
+                        <th>Benefit</th>
+                        <th>Low Estimate</th>
+                        <th>High Estimate</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${Object.entries(data.data.formatted_data).map(([key, value]) => `
+                    ${Object.entries(data.data.benefits).map(([key, value]) => `
                         <tr>
                             <td>${key.replace(/_/g, ' ')}</td>
-                            <td>${value || 'N/A'}</td>
+                            <td>${value.low || 'N/A'}</td>
+                            <td>${value.high || 'N/A'}</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         `;
-        summary = data.data.summary || '';
-    } else if (data.output) {
-        summary = data.output;
-    } else {
-        summary = 'No detailed data available.';
     }
+
+    // Set summary text
+    summary = data.data && data.data.summary ? data.data.summary : 'No summary available.';
 
     chatMessages.append(`
         <div class="message bot-message fade-in">

@@ -7,6 +7,7 @@ from tools import FinanceTools
 import json
 import os
 import re
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,6 +17,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 finance_tools = FinanceTools()
+
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
 
 @app.get("/")
 async def root(request: Request):
@@ -31,61 +34,109 @@ async def websocket_endpoint(websocket: WebSocket):
             
             await websocket.send_json({"type": "thinking", "status": True})
             
-            collector_agent = DataCollectorAgent()
-            formatter_agent = DataFormatterAgent()
-            summary_agent = SummaryGeneratorAgent()
-            
-            crew = Crew(
-                agents=[collector_agent.agent, formatter_agent.agent, summary_agent.agent],
-                tasks=[
-                    collector_agent.create_task(company_input, finance_tools, websocket),
-                    formatter_agent.create_task(),
-                    summary_agent.create_task()
-                ],
-                process=Process.sequential,
-                verbose=True
-            )
-            
-            result = crew.kickoff()
-            
-            # Extract task outputs
-            collector_output = result.tasks_output[0].raw
-            formatter_output = result.tasks_output[1].raw
-            summary_output = result.tasks_output[2].raw
-            
-            # Handle non-inventory case
-            if isinstance(collector_output, str) and "inventory-based" in collector_output:
-                await websocket.send_json({
-                    "type": "message",
-                    "content": collector_output
-                })
-            else:
-                # Handle formatter_output (might be string with embedded JSON or invalid escapes)
-                if isinstance(formatter_output, str):
-                    # Extract JSON from ```json markers if present
-                    json_match = re.search(r'```json\s*(.*?)\s*```', formatter_output, re.DOTALL)
-                    if json_match:
-                        json_str = json_match.group(1)
+            retries = 0
+            while retries < MAX_RETRIES:
+                try:
+                    collector_agent = DataCollectorAgent()
+                    formatter_agent = DataFormatterAgent()
+                    summary_agent = SummaryGeneratorAgent()
+                    
+                    crew = Crew(
+                        agents=[collector_agent.agent, formatter_agent.agent, summary_agent.agent],
+                        tasks=[
+                            collector_agent.create_task(company_input, finance_tools, websocket),
+                            formatter_agent.create_task(),
+                            summary_agent.create_task()
+                        ],
+                        process=Process.sequential,
+                        verbose=True
+                    )
+                    
+                    result = crew.kickoff()
+                    
+                    # Extract task outputs
+                    collector_output = result.tasks_output[0].raw
+                    formatter_output = result.tasks_output[1].raw
+                    summary_output = result.tasks_output[2].raw
+                    
+                    # Handle error messages or plain strings
+                    if isinstance(collector_output, str):
+                        if "Error" in collector_output or "inventory-based" in collector_output:
+                            await websocket.send_json({
+                                "type": "message",
+                                "content": collector_output
+                            })
+                            break
+                        # Parse embedded JSON from string
+                        json_match = re.search(r'\{.*\}', collector_output, re.DOTALL)
+                        if json_match:
+                            try:
+                                json_str = json_match.group(0)
+                                json_str = json_str.replace(r'\\$', '$')
+                                benefits = json.loads(json_str)
+                                # Fix malformed arrays to objects
+                                for key in benefits:
+                                    if isinstance(benefits[key], list) and len(benefits[key]) == 2:
+                                        benefits[key] = {"low": benefits[key][0]["low"], "high": benefits[key][1]["high"]}
+                                summary = collector_output.replace(json_str, "").strip() or summary_output or "Financial benefits calculated."
+                                await websocket.send_json({
+                                    "type": "result",
+                                    "data": {
+                                        "benefits": benefits,
+                                        "summary": summary
+                                    }
+                                })
+                                break
+                            except (json.JSONDecodeError, KeyError):
+                                await websocket.send_json({
+                                    "type": "message",
+                                    "content": collector_output
+                                })
+                                break
+                    
+                    # Handle formatter_output
+                    if isinstance(formatter_output, str):
+                        json_match = re.search(r'\{.*\}', formatter_output, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(0)
+                            json_str = json_str.replace(r'\\$', '$')
+                            benefits = json.loads(json_str)
+                            # Fix malformed arrays to objects
+                            for key in benefits:
+                                if isinstance(benefits[key], list) and len(benefits[key]) == 2:
+                                    benefits[key] = {"low": benefits[key][0]["low"], "high": benefits[key][1]["high"]}
+                            summary = formatter_output.replace(json_str, "").strip() or summary_output or "Financial benefits calculated."
+                        else:
+                            json_str = formatter_output.replace(r'\\$', '$')
+                            benefits = json.loads(json_str)
+                            summary = summary_output or "Financial benefits calculated."
                     else:
-                        json_str = formatter_output
+                        benefits = formatter_output
+                        summary = summary_output or "Financial benefits calculated."
                     
-                    # Fix invalid escape sequences (e.g., \\$ to $)
-                    json_str = json_str.replace(r'\\$', '$')
-                    
-                    try:
-                        formatted_data = json.loads(json_str)
-                    except json.JSONDecodeError as e:
-                        formatted_data = {"error": f"Failed to parse formatter output as JSON: {str(e)}"}
-                else:
-                    formatted_data = formatter_output  # Assume it’s a dict
+                    await websocket.send_json({
+                        "type": "result",
+                        "data": {
+                            "benefits": benefits,
+                            "summary": summary
+                        }
+                    })
+                    break
                 
-                await websocket.send_json({
-                    "type": "result",
-                    "data": {
-                        "formatted_data": formatted_data,
-                        "summary": summary_output if isinstance(summary_output, str) else "No summary available"
-                    }
-                })
+                except (Exception, json.JSONDecodeError) as e:
+                    retries += 1
+                    if retries == MAX_RETRIES:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Failed after {MAX_RETRIES} attempts: {str(e)}"
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "message",
+                            "content": f"Retry attempt {retries + 1}/{MAX_RETRIES} due to error: {str(e)}"
+                        })
+                        await websocket.send_json({"type": "thinking", "status": True})
+                        time.sleep(2)
             
     except Exception as e:
         await websocket.send_json({"type": "error", "message": str(e)})
