@@ -12,12 +12,93 @@ from typing import Any, Optional, Dict, Tuple
 
 load_dotenv()
 
+def format_amount(value, currency="USD"):
+    """Format a numeric value into a readable string with currency."""
+    if value == "Not Available" or value is None:
+        return "Not Available"
+    try:
+        value = float(value)
+        if value >= 1e9:
+            return f"{currency} {value / 1e9:.2f}B"  # Billions
+        elif value >= 1e6:
+            return f"{currency} {value / 1e6:.2f}M"  # Millions
+        elif value >= 1e3:
+            return f"{currency} {value / 1e3:.2f}K"  # Thousands
+        else:
+            return f"{currency} {value:.2f}"  # Less than thousands
+    except (ValueError, TypeError):
+        return str(value)
+
+def format_date(date):
+    """Format a date string or Timestamp into DD-MMM-YYYY."""
+    if date == "Not Available" or date is None:
+        return "Not Available"
+    try:
+        if isinstance(date, pd.Timestamp):
+            return date.strftime("%d-%b-%Y")
+        return datetime.strptime(str(date), "%Y-%m-%d").strftime("%d-%b-%Y")
+    except (ValueError, TypeError):
+        return str(date)
+
+class YFinanceTool(BaseTool):
+    name: str = "YahooFinanceDataFetcher"
+    description: str = "Fetches financial data from Yahoo Finance for a given ticker symbol."
+
+    def _run(self, ticker: str) -> dict:
+        try:
+            stock = yf.Ticker(ticker.upper())
+            info = stock.info
+            if not info or info.get('symbol') is None:
+                return {"error": "Company not found. Please check the ticker and try again."}
+
+            balance_sheet = stock.balance_sheet
+            income_statement = stock.financials
+
+            if balance_sheet.empty and income_statement.empty:
+                return {"error": "Company not found. Please check the ticker and try again."}
+
+            latest_inventory_date = balance_sheet.columns[0] if not balance_sheet.empty else "Not Available"
+            latest_financial_date = income_statement.columns[0] if not income_statement.empty else "Not Available"
+
+            inventory_cost = balance_sheet.loc['Inventory', latest_inventory_date] if 'Inventory' in balance_sheet.index else "Not Available"
+            if isinstance(inventory_cost, float) and pd.isna(inventory_cost):
+                inventory_cost = "Not Available"
+
+            if inventory_cost == "Not Available" or (isinstance(inventory_cost, (int, float)) and inventory_cost <= 0):
+                return {"error": f"This application is designed for inventory-based companies only. '{ticker.upper()}' does not have significant inventory data."}
+
+            cogs = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else "Not Available"
+            revenue = income_statement.loc['Total Revenue', latest_financial_date] if 'Total Revenue' in income_statement.index else 0
+            gross_profit = income_statement.loc['Gross Profit', latest_financial_date] if 'Gross Profit' in income_statement.index else "Not Available"
+            market_cap = info.get('marketCap', 0)
+            headcount = info.get('fullTimeEmployees', "Not Available")
+            sga_expense = income_statement.loc['Selling General And Administration', latest_financial_date] if 'Selling General And Administration' in income_statement.index else "Not Available"
+            cost_of_revenue = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else 0
+            currency = info.get("currency", "USD")  # Default to USD if not available
+
+            gross_profit_percentage = (gross_profit / revenue * 100) if isinstance(gross_profit, (int, float)) and revenue > 0 else "Not Available"
+            salary_avg = sga_expense / headcount if headcount != "Not Available" and sga_expense != "Not Available" else "Not Available"
+
+            return {
+                "company": ticker.upper(),
+                "analized_data_date": format_date(latest_inventory_date),
+                "balance_sheet_inventory_cost": format_amount(inventory_cost, currency),
+                "P&L_inventory_cost": format_amount(cogs, currency),
+                "Revenue": format_amount(revenue, currency),
+                "Headcount Old": headcount if headcount == "Not Available" else f"{headcount:,}",
+                "Salary Average": format_amount(salary_avg, currency),
+                "gross_profit": format_amount(gross_profit, currency),
+                "gross_profit_percentage": f"{gross_profit_percentage:.2f}" if gross_profit_percentage != "Not Available" else "Not Available",
+                "market_cap": format_amount(market_cap, currency),
+                "currency": currency
+            }
+        except Exception as e:
+            return {"error": f"Failed to fetch data for '{ticker.upper()}': {str(e)}"}
 
 class CalculatorTool(BaseTool):
     name: str = "CalculatorTool"
     description: str = "Calculates financial benefits based on company financial data and company type determined by revenue."
 
-    # Annotated benefit_mapping with type hint
     benefit_mapping: Dict[str, Dict[str, Tuple[float, float]]] = {
         "Global": {
             "Margin Rate Lift (bps)": (1.00, 1.50),
@@ -50,14 +131,20 @@ class CalculatorTool(BaseTool):
     }
 
     def _run(self, financial_data: dict) -> dict:
-        """Calculate financial benefits directly within the tool."""
         def parse_currency(value: str) -> float:
+            """Parse formatted currency strings (e.g., 'USD 96.77B') into a float."""
+            if value == "Not Available" or value is None:
+                return 0
             try:
-                value = value.replace('$', '').replace(',', '').strip()
-                if 'billion' in value.lower():
-                    return float(value.replace('billion', '').strip()) * 1e9
-                elif 'million' in value.lower():
-                    return float(value.replace('million', '').strip()) * 1e6
+                value = str(value).replace(',', '').strip()
+                # Remove currency prefix (e.g., "USD ")
+                value = re.sub(r'^[A-Z]{3}\s+', '', value)
+                if 'B' in value.upper():
+                    return float(value.replace('B', '').strip()) * 1e9
+                elif 'M' in value.upper():
+                    return float(value.replace('M', '').strip()) * 1e6
+                elif 'K' in value.upper():
+                    return float(value.replace('K', '').strip()) * 1e3
                 else:
                     return float(value)
             except (ValueError, AttributeError):
@@ -66,6 +153,7 @@ class CalculatorTool(BaseTool):
         def get_company_type(revenue):
             if isinstance(revenue, str):
                 revenue = parse_currency(revenue)
+            print(f"Parsed Revenue for company type: {revenue}")
             if not isinstance(revenue, (int, float)) or revenue <= 0:
                 return "Startup"
             if revenue > 50e9:
@@ -77,111 +165,63 @@ class CalculatorTool(BaseTool):
             else:
                 return "Startup"
 
+        print(f"Financial Data Input: {financial_data}")
         company_type = get_company_type(financial_data.get("Revenue", 0))
+        print(f"Company Type: {company_type}")
         percentages = self.benefit_mapping.get(company_type, self.benefit_mapping["Startup"])
         
         revenue = financial_data.get("Revenue", "Not Available")
         inventory_cost = financial_data.get("balance_sheet_inventory_cost", "Not Available")
         gross_profit = financial_data.get("gross_profit", "Not Available")
         gross_profit_pct = financial_data.get("gross_profit_percentage", "Not Available")
-        headcount = financial_data.get("Headcount", "Not Available")
+        headcount = financial_data.get("Headcount Old", "Not Available")
         salary_avg = financial_data.get("Salary Average", "Not Available")
+        currency = financial_data.get("currency", "USD")
 
         revenue = parse_currency(revenue) if isinstance(revenue, str) else revenue if revenue != "Not Available" else 0
         inventory_cost = parse_currency(inventory_cost) if isinstance(inventory_cost, str) else inventory_cost if inventory_cost != "Not Available" else 0
         gross_profit = parse_currency(gross_profit) if isinstance(gross_profit, str) else gross_profit if gross_profit != "Not Available" else 0
         gross_profit_pct = float(gross_profit_pct) if isinstance(gross_profit_pct, (str, int, float)) and gross_profit_pct != "Not Available" else 0
-        headcount = int(headcount.replace(',', '')) if isinstance(headcount, str) and headcount != "Not Available" else headcount if headcount != "Not Available" else 0
+        headcount = int(str(headcount).replace(',', '')) if isinstance(headcount, str) and headcount != "Not Available" else headcount if headcount != "Not Available" else 0
         salary_avg = parse_currency(salary_avg) if isinstance(salary_avg, str) else salary_avg if salary_avg != "Not Available" else 0
+
+        print(f"Parsed Values - Revenue: {revenue}, Inventory Cost: {inventory_cost}, Gross Profit: {gross_profit}, Gross Profit %: {gross_profit_pct}, Headcount: {headcount}, Salary Avg: {salary_avg}")
 
         def safe_calc(low, high, calc_func):
             try:
-                return {"low": calc_func(low), "high": calc_func(high)}
-            except:
+                low_val = calc_func(low)
+                high_val = calc_func(high)
+                print(f"Calculated - Low: {low_val}, High: {high_val}")
+                return {"low": format_amount(low_val, currency), "high": format_amount(high_val, currency)}
+            except Exception as e:
+                print(f"Calculation failed: {str(e)}")
                 return {"low": "Not Available", "high": "Not Available"}
 
         results = {
-            "Margin_Rate_Lift": safe_calc(
+            "Margin Rate Lift (bps)": safe_calc(
                 percentages["Margin Rate Lift (bps)"][0], percentages["Margin Rate Lift (bps)"][1],
                 lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else "Not Available"
             ),
-            "Margin_on_Revenue_Lift": safe_calc(
+            "Margin on Revenue Lift": safe_calc(
                 percentages["Margin on Revenue Lift"][0], percentages["Margin on Revenue Lift"][1],
                 lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else "Not Available"
             ),
-            "Efficiency_Re_Investment": safe_calc(
+            "Efficiency Re-Investment": safe_calc(
                 percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
                 lambda x: (headcount - (headcount * 100 / (x + 100))) * salary_avg if headcount and salary_avg else "Not Available"
             ),
-            "Reduction_in_Xfer_Expenses": safe_calc(
+            "Reduction in Xfer Expenses": safe_calc(
                 percentages["Reduction in Xfer Expenses"][0], percentages["Reduction in Xfer Expenses"][1],
                 lambda x: (x / 100) * inventory_cost if inventory_cost else "Not Available"
             ),
-            "Inventory_Carrying_Costs": safe_calc(
+            "Inventory Carrying Costs": safe_calc(
                 percentages["Inventory Carrying Costs"][0], percentages["Inventory Carrying Costs"][1],
                 lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else "Not Available"
             )
         }
+        print(f"Final Results: {results}")
         return results
 
-
-class YFinanceTool(BaseTool):
-    name: str = "YahooFinanceDataFetcher"
-    description: str = "Fetches financial data from Yahoo Finance for a given ticker symbol."
-
-    def _run(self, ticker: str) -> dict:
-        """Fetch financial data including currency type similar to DataFetcher.get_financials()."""
-        try:
-            stock = yf.Ticker(ticker.upper())
-            info = stock.info
-            if not info or info.get('symbol') is None:
-                return {"error": "Company not found. Please check the ticker and try again."}
-
-            balance_sheet = stock.balance_sheet
-            income_statement = stock.financials
-
-            if balance_sheet.empty and income_statement.empty:
-                return {"error": "Company not found. Please check the ticker and try again."}
-
-            latest_inventory_date = balance_sheet.columns[0] if not balance_sheet.empty else "Not Available"
-            latest_financial_date = income_statement.columns[0] if not income_statement.empty else "Not Available"
-
-            # Fetch inventory cost and handle NaN
-            inventory_cost = balance_sheet.loc['Inventory', latest_inventory_date] if 'Inventory' in balance_sheet.index else "Not Available"
-            if isinstance(inventory_cost, float) and pd.isna(inventory_cost):
-                inventory_cost = "Not Available"
-
-            # Check if the company has significant inventory
-            if inventory_cost == "Not Available" or (isinstance(inventory_cost, (int, float)) and inventory_cost <= 0):
-                return {"error": f"This application is designed for inventory-based companies only. '{ticker.upper()}' does not have significant inventory data."}
-
-            cogs = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else "Not Available"
-            revenue = income_statement.loc['Total Revenue', latest_financial_date] if 'Total Revenue' in income_statement.index else 0
-            gross_profit = income_statement.loc['Gross Profit', latest_financial_date] if 'Gross Profit' in income_statement.index else "Not Available"
-            market_cap = info.get('marketCap', 0)
-            headcount = info.get('fullTimeEmployees', "Not Available")
-            sga_expense = income_statement.loc['Selling General And Administration', latest_financial_date] if 'Selling General And Administration' in income_statement.index else "Not Available"
-            cost_of_revenue = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else 0
-            currency = info.get("currency", "Currency info not available")  # Fetch currency type
-
-            gross_profit_percentage = (gross_profit / revenue * 100) if isinstance(gross_profit, (int, float)) and revenue > 0 else "Not Available"
-            salary_avg = sga_expense / headcount if headcount != "Not Available" and sga_expense != "Not Available" else "Not Available"
-
-            return {
-                "company": ticker.upper(),
-                "analized_data_date": latest_inventory_date,
-                "balance_sheet_inventory_cost": inventory_cost,
-                "P&L_inventory_cost": cogs,
-                "Revenue": revenue,
-                "Headcount Old": headcount,
-                "Salary Average": salary_avg,
-                "gross_profit": gross_profit,
-                "gross_profit_percentage": gross_profit_percentage,
-                "market_cap": market_cap,
-                "currency": currency  # Added currency field
-            }
-        except Exception as e:
-            return {"error": f"Failed to fetch data for '{ticker.upper()}': {str(e)}"}
 
 class AlphaVantageTool(BaseTool):
     name: str = "AlphaVantageDataFetcher"
@@ -283,117 +323,6 @@ class TickerLookupTool(BaseTool):
         except Exception as e:
             return f"Error: Unexpected failure for '{company_name}' - {str(e)}"
         
-class Calculator:
-    def __init__(self):
-        self.benefit_mapping = {
-            "Global": {
-                "Margin Rate Lift (bps)": (1.00, 1.50),
-                "Margin on Revenue Lift": (0.50, 1.00),
-                "Efficiency Re-Investment": (100, 200),
-                "Reduction in Xfer Expenses": (0.020, 0.024),
-                "Inventory Carrying Costs": (5.0, 12.0)
-            },
-            "Leader": {
-                "Margin Rate Lift (bps)": (0.75, 1.20),
-                "Margin on Revenue Lift": (0.40, 0.80),
-                "Efficiency Re-Investment": (75, 150),
-                "Reduction in Xfer Expenses": (0.015, 0.020),
-                "Inventory Carrying Costs": (3.0, 10.0)
-            },
-            "Challenger": {
-                "Margin Rate Lift (bps)": (0.50, 1.00),
-                "Margin on Revenue Lift": (0.30, 0.60),
-                "Efficiency Re-Investment": (50, 100),
-                "Reduction in Xfer Expenses": (0.010, 0.016),
-                "Inventory Carrying Costs": (2.0, 8.0)
-            },
-            "Startup": {
-                "Margin Rate Lift (bps)": (0.25, 0.80),
-                "Margin on Revenue Lift": (0.10, 0.50),
-                "Efficiency Re-Investment": (30, 80),
-                "Reduction in Xfer Expenses": (0.005, 0.012),
-                "Inventory Carrying Costs": (1.0, 5.0)
-            }
-        }
-
-    def get_company_type(self, revenue):
-        """Determine company type based on revenue (in dollars)."""
-        if isinstance(revenue, str):
-            revenue = self.parse_currency(revenue)
-        if not isinstance(revenue, (int, float)) or revenue <= 0:
-            return "Startup"
-        if revenue > 50e9:  # $50 billion
-            return "Global"
-        elif revenue > 10e9:  # $10 billion
-            return "Leader"
-        elif revenue > 1e9:  # $1 billion
-            return "Challenger"
-        else:
-            return "Startup"
-
-    def parse_currency(self, value: str) -> float:
-        """Parse string values like '$133.7 billion' to float."""
-        try:
-            value = value.replace('$', '').replace(',', '').strip()
-            if 'billion' in value.lower():
-                return float(value.replace('billion', '').strip()) * 1e9
-            elif 'million' in value.lower():
-                return float(value.replace('million', '').strip()) * 1e6
-            else:
-                return float(value)
-        except (ValueError, AttributeError):
-            return 0
-
-    def calculate_benefits(self, values):
-        """Calculate financial benefits based on company type and financial data."""
-        company_type = self.get_company_type(values.get("Revenue", 0))
-        percentages = self.benefit_mapping.get(company_type, self.benefit_mapping["Startup"])
-        
-        revenue = values.get("Revenue", "Not Available")
-        inventory_cost = values.get("balance_sheet_inventory_cost", "Not Available")
-        gross_profit = values.get("gross_profit", "Not Available")
-        gross_profit_pct = values.get("gross_profit_percentage", "Not Available")
-        headcount = values.get("Headcount", "Not Available")
-        salary_avg = values.get("Salary Average", "Not Available")
-
-        # Convert to numeric values if possible
-        revenue = self.parse_currency(revenue) if isinstance(revenue, str) else revenue if revenue != "Not Available" else 0
-        inventory_cost = self.parse_currency(inventory_cost) if isinstance(inventory_cost, str) else inventory_cost if inventory_cost != "Not Available" else 0
-        gross_profit = self.parse_currency(gross_profit) if isinstance(gross_profit, str) else gross_profit if gross_profit != "Not Available" else 0
-        gross_profit_pct = float(gross_profit_pct) if isinstance(gross_profit_pct, (str, int, float)) and gross_profit_pct != "Not Available" else 0
-        headcount = int(headcount.replace(',', '')) if isinstance(headcount, str) and headcount != "Not Available" else headcount if headcount != "Not Available" else 0
-        salary_avg = self.parse_currency(salary_avg) if isinstance(salary_avg, str) else salary_avg if salary_avg != "Not Available" else 0
-
-        def safe_calc(low, high, calc_func):
-            try:
-                return {"low": calc_func(low), "high": calc_func(high)}
-            except:
-                return {"low": "Not Available", "high": "Not Available"}
-
-        results = {
-            "Margin_Rate_Lift": safe_calc(
-                percentages["Margin Rate Lift (bps)"][0], percentages["Margin Rate Lift (bps)"][1],
-                lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else "Not Available"
-            ),
-            "Margin_on_Revenue_Lift": safe_calc(
-                percentages["Margin on Revenue Lift"][0], percentages["Margin on Revenue Lift"][1],
-                lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else "Not Available"
-            ),
-            "Efficiency_Re_Investment": safe_calc(
-                percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
-                lambda x: (headcount - (headcount * 100 / (x + 100))) * salary_avg if headcount and salary_avg else "Not Available"
-            ),
-            "Reduction_in_Xfer_Expenses": safe_calc(
-                percentages["Reduction in Xfer Expenses"][0], percentages["Reduction in Xfer Expenses"][1],
-                lambda x: (x / 100) * inventory_cost if inventory_cost else "Not Available"
-            ),
-            "Inventory_Carrying_Costs": safe_calc(
-                percentages["Inventory Carrying Costs"][0], percentages["Inventory Carrying Costs"][1],
-                lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else "Not Available"
-            )
-        }
-        return results
-    
 
 
 class FinanceTools:
@@ -406,4 +335,4 @@ class FinanceTools:
         self.inventory_check_tool = InventoryCheckTool()
         self.search_company_tool = SearchCompanyTool()
         self.ticker_lookup_tool = TickerLookupTool()
-        # self.calculator_tool = CalculatorTool()
+        self.calculator_tool = CalculatorTool()

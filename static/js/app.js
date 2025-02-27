@@ -57,12 +57,15 @@ function sendMessage() {
 
 
 function renderResults(data) {
-    let table = '';
+    let financialTable = '';
+    let benefitsTable = '';
     let summary = '';
 
+    // Financial Data Table
     if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
-        const currency = data.data.financial_data.currency || ''; // Fetch currency type
-        table = `
+        const currency = data.data.financial_data.currency || '';
+        financialTable = `
+            <h4>Financial Data</h4>
             <table class="table table-dark table-striped mt-3">
                 <thead>
                     <tr>
@@ -72,11 +75,10 @@ function renderResults(data) {
                 </thead>
                 <tbody>
                     ${Object.entries(data.data.financial_data).map(([key, value]) => {
-                        // Apply currency prefix to monetary fields
                         const monetaryFields = ["balance_sheet_inventory_cost", "P&L_inventory_cost", "Revenue", "Salary Average", "gross_profit", "market_cap"];
                         let displayValue = value || 'N/A';
                         if (monetaryFields.includes(key) && value && value !== "Not Available") {
-                            displayValue = `${currency} ${value}`;
+                            displayValue = `${value}`;
                         }
                         return `
                             <tr>
@@ -88,14 +90,41 @@ function renderResults(data) {
                 </tbody>
             </table>
         `;
-        summary = data.data.summary || 'Financial data collected.';
+    }
+
+    // Benefits Table
+    if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
+        const currency = data.data.financial_data.currency || '';
+        benefitsTable = `
+            <h4>Calculated Benefits</h4>
+            <table class="table table-dark table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>Benefit</th>
+                        <th>Low Estimate</th>
+                        <th>High Estimate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(data.data.benefits).map(([key, value]) => `
+                        <tr>
+                            <td>${key.replace(/_/g, ' ')}</td>
+                            <td>${value.low || 'N/A'}</td>
+                            <td>${value.high || 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        summary = data.data.summary || 'Financial benefits calculated.';
     } else {
-        summary = 'No detailed data available.';
+        summary = 'No benefits calculated due to insufficient data.';
     }
 
     chatMessages.append(`
         <div class="message bot-message fade-in">
-            ${table}
+            ${financialTable}
+            ${benefitsTable}
             <div class="summary mt-3">${summary}</div>
         </div>
     `);
