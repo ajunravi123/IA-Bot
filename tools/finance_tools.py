@@ -19,11 +19,11 @@ def format_amount(value, currency="USD"):
     try:
         value = float(value)
         if value >= 1e9:
-            return f"{currency} {value / 1e9:.2f}B"  # Billions
+            return f"{currency} {value / 1e9:.2f} B"  # Billions
         elif value >= 1e6:
-            return f"{currency} {value / 1e6:.2f}M"  # Millions
+            return f"{currency} {value / 1e6:.2f} M"  # Millions
         elif value >= 1e3:
-            return f"{currency} {value / 1e3:.2f}K"  # Thousands
+            return f"{currency} {value / 1e3:.2f} K"  # Thousands
         else:
             return f"{currency} {value:.2f}"  # Less than thousands
     except (ValueError, TypeError):
