@@ -54,7 +54,54 @@ function sendMessage() {
     }
 }
 
+
+
 function renderResults(data) {
+    let table = '';
+    let summary = '';
+
+    if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
+        const currency = data.data.financial_data.currency || ''; // Fetch currency type
+        table = `
+            <table class="table table-dark table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(data.data.financial_data).map(([key, value]) => {
+                        // Apply currency prefix to monetary fields
+                        const monetaryFields = ["balance_sheet_inventory_cost", "P&L_inventory_cost", "Revenue", "Salary Average", "gross_profit", "market_cap"];
+                        let displayValue = value || 'N/A';
+                        if (monetaryFields.includes(key) && value && value !== "Not Available") {
+                            displayValue = `${currency} ${value}`;
+                        }
+                        return `
+                            <tr>
+                                <td>${key.replace(/_/g, ' ')}</td>
+                                <td>${displayValue}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+        summary = data.data.summary || 'Financial data collected.';
+    } else {
+        summary = 'No detailed data available.';
+    }
+
+    chatMessages.append(`
+        <div class="message bot-message fade-in">
+            ${table}
+            <div class="summary mt-3">${summary}</div>
+        </div>
+    `);
+}
+
+function renderResults_low_high(data) {
     let table = '';
     let summary = '';
 

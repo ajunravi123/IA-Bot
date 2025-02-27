@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import requests
 import re
+import pandas as pd
 from dotenv import load_dotenv
 from typing import Any, Optional, Dict, Tuple
 
@@ -129,29 +130,58 @@ class YFinanceTool(BaseTool):
     description: str = "Fetches financial data from Yahoo Finance for a given ticker symbol."
 
     def _run(self, ticker: str) -> dict:
+        """Fetch financial data including currency type similar to DataFetcher.get_financials()."""
         try:
-            company = yf.Ticker(ticker)
-            info = company.info
-            financials = company.financials
-            balance_sheet = company.balance_sheet
-            
-            data = {
-                "company_name": info.get("longName", ticker),
-                "analyzed_data_date": datetime.now().strftime("%Y-%m-%d"),
-                "balance_sheet_inventory_cost": balance_sheet.get("Inventory", 0),
-                "P&L_inventory_cost": financials.get("Cost Of Revenue", 0),
-                "Revenue": financials.get("Total Revenue", 0),
-                "market_cap": info.get("marketCap", 0),
-                "gross_profit": financials.get("Gross Profit", 0),
-                "gross_profit_percentage": (
-                    financials.get("Gross Profit", 0) / financials.get("Total Revenue", 0) * 100
-                ) if financials.get("Total Revenue", 0) else 0,
-                "Headcount": info.get("fullTimeEmployees", "Not Available"),
-                "Salary Average": "Not Available"  # Placeholder, as not directly available
+            stock = yf.Ticker(ticker.upper())
+            info = stock.info
+            if not info or info.get('symbol') is None:
+                return {"error": "Company not found. Please check the ticker and try again."}
+
+            balance_sheet = stock.balance_sheet
+            income_statement = stock.financials
+
+            if balance_sheet.empty and income_statement.empty:
+                return {"error": "Company not found. Please check the ticker and try again."}
+
+            latest_inventory_date = balance_sheet.columns[0] if not balance_sheet.empty else "Not Available"
+            latest_financial_date = income_statement.columns[0] if not income_statement.empty else "Not Available"
+
+            # Fetch inventory cost and handle NaN
+            inventory_cost = balance_sheet.loc['Inventory', latest_inventory_date] if 'Inventory' in balance_sheet.index else "Not Available"
+            if isinstance(inventory_cost, float) and pd.isna(inventory_cost):
+                inventory_cost = "Not Available"
+
+            # Check if the company has significant inventory
+            if inventory_cost == "Not Available" or (isinstance(inventory_cost, (int, float)) and inventory_cost <= 0):
+                return {"error": f"This application is designed for inventory-based companies only. '{ticker.upper()}' does not have significant inventory data."}
+
+            cogs = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else "Not Available"
+            revenue = income_statement.loc['Total Revenue', latest_financial_date] if 'Total Revenue' in income_statement.index else 0
+            gross_profit = income_statement.loc['Gross Profit', latest_financial_date] if 'Gross Profit' in income_statement.index else "Not Available"
+            market_cap = info.get('marketCap', 0)
+            headcount = info.get('fullTimeEmployees', "Not Available")
+            sga_expense = income_statement.loc['Selling General And Administration', latest_financial_date] if 'Selling General And Administration' in income_statement.index else "Not Available"
+            cost_of_revenue = income_statement.loc['Cost Of Revenue', latest_financial_date] if 'Cost Of Revenue' in income_statement.index else 0
+            currency = info.get("currency", "Currency info not available")  # Fetch currency type
+
+            gross_profit_percentage = (gross_profit / revenue * 100) if isinstance(gross_profit, (int, float)) and revenue > 0 else "Not Available"
+            salary_avg = sga_expense / headcount if headcount != "Not Available" and sga_expense != "Not Available" else "Not Available"
+
+            return {
+                "company": ticker.upper(),
+                "analized_data_date": latest_inventory_date,
+                "balance_sheet_inventory_cost": inventory_cost,
+                "P&L_inventory_cost": cogs,
+                "Revenue": revenue,
+                "Headcount Old": headcount,
+                "Salary Average": salary_avg,
+                "gross_profit": gross_profit,
+                "gross_profit_percentage": gross_profit_percentage,
+                "market_cap": market_cap,
+                "currency": currency  # Added currency field
             }
-            return data
         except Exception as e:
-            return {"error": f"Yahoo Finance error: {str(e)}"}
+            return {"error": f"Failed to fetch data for '{ticker.upper()}': {str(e)}"}
 
 class AlphaVantageTool(BaseTool):
     name: str = "AlphaVantageDataFetcher"
@@ -363,6 +393,8 @@ class Calculator:
             )
         }
         return results
+    
+
 
 class FinanceTools:
     def __init__(self):
@@ -374,4 +406,4 @@ class FinanceTools:
         self.inventory_check_tool = InventoryCheckTool()
         self.search_company_tool = SearchCompanyTool()
         self.ticker_lookup_tool = TickerLookupTool()
-        self.calculator_tool = CalculatorTool()
+        # self.calculator_tool = CalculatorTool()

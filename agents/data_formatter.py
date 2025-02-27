@@ -1,3 +1,4 @@
+# In agents/data_formatter.py
 from crewai import Agent, Task
 from config import llm_client
 import os
@@ -9,15 +10,15 @@ class DataFormatterAgent:
     def __init__(self):
         self.agent = Agent(
             role='Data Formatter',
-            goal='Format financial data into a structured JSON response',
-            backstory='Specialist in data structuring and presentation',
+            goal='Format collected financial data into a structured JSON response',
+            backstory='Specialist in structuring financial data from various sources into a consistent format',
             verbose=True,
             llm=llm_client,
         )
 
     def create_task(self):
         return Task(
-            description="Take the collected financial data and format it into a clean JSON structure containing only the following financial benefits: 'Margin_Rate_Lift', 'Margin_on_Revenue_Lift', 'Efficiency_Re_Investment', 'Reduction_in_Xfer_Expenses', 'Inventory_Carrying_Costs'. Each benefit should have 'low' and 'high' estimate values as calculated. Return only the JSON object with no additional text, nested keys (e.g., 'Action observational'), or explanations before or after the JSON. Ensure all values are in English.",
-            expected_output="A JSON object with the financial benefits formatted as: {'Margin_Rate_Lift': {'low': value, 'high': value}, 'Margin_on_Revenue_Lift': {'low': value, 'high': value}, 'Efficiency_Re_Investment': {'low': value, 'high': value}, 'Reduction_in_Xfer_Expenses': {'low': value, 'high': value}, 'Inventory_Carrying_Costs': {'low': value, 'high': value}}",
+            description="Take the collected financial data from DataCollectorAgent and format it into a clean JSON structure containing only the following fields: 'company', 'analized_data_date', 'balance_sheet_inventory_cost', 'P&L_inventory_cost', 'Revenue', 'Headcount Old', 'Salary Average', 'gross_profit', 'gross_profit_percentage', 'market_cap', 'currency'. Ensure the output is a JSON object with these exact field names, preserving the values as provided (numbers or strings with units like '$200 million'), and include the 'currency' field to indicate the currency type of monetary amounts. Include only these fields with no additional text, markers (e.g., '**', '```json'), or calculations. If a field is missing or 'Not Available', retain it as 'Not Available' in the output.",
+            expected_output="A JSON object with the financial data formatted as: {'company': value, 'analized_data_date': value, 'balance_sheet_inventory_cost': value, 'P&L_inventory_cost': value, 'Revenue': value, 'Headcount Old': value, 'Salary Average': value, 'gross_profit': value, 'gross_profit_percentage': value, 'market_cap': value, 'currency': value}",
             agent=self.agent
         )

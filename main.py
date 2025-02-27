@@ -59,9 +59,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     formatter_output = result.tasks_output[1].raw
                     summary_output = result.tasks_output[2].raw
                     
-                    # Handle error messages or plain strings
+                    # Handle error messages
                     if isinstance(collector_output, str):
-                        if "Error" in collector_output or "inventory-based" in collector_output:
+                        if "Error" in collector_output or "inventory-based" in collector_output or "No data available" in collector_output:
                             await websocket.send_json({
                                 "type": "message",
                                 "content": collector_output
@@ -73,21 +73,17 @@ async def websocket_endpoint(websocket: WebSocket):
                             try:
                                 json_str = json_match.group(0)
                                 json_str = json_str.replace(r'\\$', '$')
-                                benefits = json.loads(json_str)
-                                # Fix malformed arrays to objects
-                                for key in benefits:
-                                    if isinstance(benefits[key], list) and len(benefits[key]) == 2:
-                                        benefits[key] = {"low": benefits[key][0]["low"], "high": benefits[key][1]["high"]}
-                                summary = collector_output.replace(json_str, "").strip() or summary_output or "Financial benefits calculated."
+                                financial_data = json.loads(json_str)
+                                summary = collector_output.replace(json_str, "").strip() or summary_output or "Financial data collected."
                                 await websocket.send_json({
                                     "type": "result",
                                     "data": {
-                                        "benefits": benefits,
+                                        "financial_data": financial_data,
                                         "summary": summary
                                     }
                                 })
                                 break
-                            except (json.JSONDecodeError, KeyError):
+                            except json.JSONDecodeError:
                                 await websocket.send_json({
                                     "type": "message",
                                     "content": collector_output
@@ -100,24 +96,20 @@ async def websocket_endpoint(websocket: WebSocket):
                         if json_match:
                             json_str = json_match.group(0)
                             json_str = json_str.replace(r'\\$', '$')
-                            benefits = json.loads(json_str)
-                            # Fix malformed arrays to objects
-                            for key in benefits:
-                                if isinstance(benefits[key], list) and len(benefits[key]) == 2:
-                                    benefits[key] = {"low": benefits[key][0]["low"], "high": benefits[key][1]["high"]}
-                            summary = formatter_output.replace(json_str, "").strip() or summary_output or "Financial benefits calculated."
+                            financial_data = json.loads(json_str)
+                            summary = formatter_output.replace(json_str, "").strip() or summary_output or "Financial data collected."
                         else:
                             json_str = formatter_output.replace(r'\\$', '$')
-                            benefits = json.loads(json_str)
-                            summary = summary_output or "Financial benefits calculated."
+                            financial_data = json.loads(json_str)
+                            summary = summary_output or "Financial data collected."
                     else:
-                        benefits = formatter_output
-                        summary = summary_output or "Financial benefits calculated."
+                        financial_data = formatter_output
+                        summary = summary_output or "Financial data collected."
                     
                     await websocket.send_json({
                         "type": "result",
                         "data": {
-                            "benefits": benefits,
+                            "financial_data": financial_data,
                             "summary": summary
                         }
                     })
