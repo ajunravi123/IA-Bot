@@ -63,6 +63,65 @@ function parseBenefitValue(value) {
     return num * (suffix === 'B' ? 1e9 : suffix === 'M' ? 1e6 : suffix === 'K' ? 1e3 : 1);
 }
 
+// Store Chart instances to manage them
+const chartInstances = new Map();
+
+function createBarChart(canvasId, labels, lowValues, highValues, currency) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+
+    // Destroy any existing chart instance for this canvas
+    if (chartInstances.has(canvasId)) {
+        chartInstances.get(canvasId).destroy();
+    }
+
+    // Create new chart and store it
+    const newChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Low Estimate',
+                data: lowValues,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }, {
+                label: 'High Estimate',
+                data: highValues,
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: `Value (${currency})`
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Benefits'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+
+    chartInstances.set(canvasId, newChart);
+}
+
 function renderResults(data) {
     let financialTable = '';
     let benefitsTable = '';
@@ -100,7 +159,7 @@ function renderResults(data) {
         `;
     }
 
-    // Benefits Table and Bar Chart Data
+    // Benefits Table and Bar Chart
     if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
         const currency = data.data.financial_data.currency || '';
         benefitsTable = `
@@ -130,70 +189,35 @@ function renderResults(data) {
         const lowValues = labels.map(key => parseBenefitValue(data.data.benefits[key].low));
         const highValues = labels.map(key => parseBenefitValue(data.data.benefits[key].high));
 
-        // Create unique canvas ID based on timestamp
+        // Create unique canvas ID
         const canvasId = `benefitsChart_${Date.now()}`;
         barChart = `
             <h4>Benefits Bar Graph</h4>
             <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
-            <script>
-                const ctx = document.getElementById('${canvasId}').getContext('2d');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: ${JSON.stringify(labels)},
-                        datasets: [{
-                            label: 'Low Estimate',
-                            data: ${JSON.stringify(lowValues)},
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        }, {
-                            label: 'High Estimate',
-                            data: ${JSON.stringify(highValues)},
-                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Value (${currency})'
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Benefits'
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top'
-                            }
-                        }
-                    }
-                });
-            </script>
         `;
-        summary = data.data.summary || 'Financial benefits calculated.';
+
+        // Append content first, then create the chart
+        chatMessages.append(`
+            <div class="message bot-message fade-in">
+                ${financialTable}
+                ${benefitsTable}
+                ${barChart}
+                <div class="summary mt-3">${data.data.summary || 'Financial benefits calculated.'}</div>
+            </div>
+        `);
+
+        // Initialize the chart after appending
+        createBarChart(canvasId, labels, lowValues, highValues, currency);
     } else {
-        summary = 'No benefits calculated due to insufficient data.';
+        chatMessages.append(`
+            <div class="message bot-message fade-in">
+                ${financialTable}
+                <div class="summary mt-3">No benefits calculated due to insufficient data.</div>
+            </div>
+        `);
     }
 
-    chatMessages.append(`
-        <div class="message bot-message fade-in">
-            ${financialTable}
-            ${benefitsTable}
-            ${barChart}
-            <div class="summary mt-3">${summary}</div>
-        </div>
-    `);
+    chatMessages.scrollTop(chatMessages[0].scrollHeight);
 }
 
 $("#user-input").keypress(function(e) {
