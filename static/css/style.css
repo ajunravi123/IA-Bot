@@ -63,20 +63,57 @@ body {
     padding: 12px 18px;
     border-radius: 10px;
     max-width: 80%;
+    position: relative;
     animation: fadeInUp 0.5s ease-out;
+}
+
+.message-content {
+    flex: 1;
+    width: 100%;
+}
+
+.financial-content, .benefits-content, .chart-content {
+    margin-bottom: 15px;
+}
+
+.message-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
 }
 
 .bot-message {
     background: #2a3265;
     color: #d0d4ff;
     border: 1px solid #3a4a9f;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
 }
 
 .user-message {
     background: #3a4a9f;
     color: #e0e0e0;
     margin-left: auto;
-    text-align: right;
+    text-align: left;
+    display: block; /* Changed from flex to block for simplicity, no icon needed */
+}
+
+.timestamp {
+    font-size: 0.7rem; /* Smaller text like WhatsApp */
+    color: #a0a0a0;
+    position: absolute;
+    bottom: 5px;
+    right: 10px;
+    flex-shrink: 0;
+}
+
+.bot-message .timestamp {
+    position: absolute;
+    bottom: 5px;
+    right: 10px;
 }
 
 /* Thinking Animation */
@@ -204,7 +241,7 @@ h1, h4 {
 /* Predefined Questions Block */
 .predefined-block {
     margin-top: 20px;
-    background: linear-gradient(135deg, #2a3265, #3a4a9f);
+    background: linear-gradient(135deg, #1e253e, #2a3265); /* Darker gradient for less brightness on the right */
     border: 2px solid #5174ff;
     border-radius: 15px;
     padding: 20px;
@@ -220,9 +257,12 @@ h1, h4 {
     font-style: italic;
     font-size: 1.1rem;
     margin-bottom: 15px;
-    text-align: left; /* Changed from center to left */
+    text-align: left; /* Left-aligned as requested */
     text-shadow: 0 0 8px rgba(81, 116, 255, 0.3);
     animation: glowText 2s infinite alternate;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
 }
 
 @keyframes glowText {
@@ -274,6 +314,17 @@ h1, h4 {
         max-width: 90%;
         padding: 8px 12px;
         font-size: 0.9rem;
+    }
+
+    .message-icon {
+        width: 25px;
+        height: 25px;
+    }
+
+    .timestamp {
+        font-size: 0.6rem; /* Smaller text like WhatsApp on mobile */
+        bottom: 3px;
+        right: 8px;
     }
 
     .thinking-spinner {
@@ -343,6 +394,15 @@ h1, h4 {
 
     .message {
         font-size: 0.85rem;
+    }
+
+    .message-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .timestamp {
+        font-size: 0.5rem; /* Even smaller on very small screens */
     }
 
     .predefined-questions .question-btn {

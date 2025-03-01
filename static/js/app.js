@@ -4,6 +4,14 @@ const socketMain = new WebSocket(`ws://${window.location.host}/ws`);
 const socketPredefined = new WebSocket(`ws://${window.location.host.replace(':8000', ':8001')}/ws`);
 const chatMessages = $("#chat-messages");
 
+// Function to format timestamp as "HH:MM AM/PM"
+function formatTimestamp() {
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+// Predefined questions to engage the user (will be fetched from predefined.py)
+let predefinedQuestions = [];
+
 // Track if first user input has been sent and if predefined questions are added
 let firstInputSent = false;
 let predefinedQuestionsAdded = false; // Flag to track if questions are already added
@@ -30,7 +38,10 @@ socketMain.onmessage = function(event) {
                 }
                 chatMessages.append(`
                     <div class="message-container" id="container-${data.request_id}">
-                        <div class="message user-message fade-in">${userMessage || "Unknown question"}</div>
+                        <div class="message user-message fade-in">
+                            ${userMessage || "Unknown question"}
+                            <span class="timestamp">${formatTimestamp()}</span>
+                        </div>
                         <div class="thinking-animation" id="loader-${data.request_id}">
                             <div class="thinking-spinner"></div>
                             <div class="thinking-dot"></div>
@@ -52,11 +63,23 @@ socketMain.onmessage = function(event) {
             break;
         case "question":
             $(`#loader-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.message}</div>`);
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    ${data.message}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
             break;
         case "message":
             $(`#loader-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.content}</div>`);
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    ${data.content}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
             pendingRequests.delete(data.request_id);
             break;
         case "result":
@@ -66,7 +89,13 @@ socketMain.onmessage = function(event) {
             break;
         case "error":
             $(`#loader-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message text-danger fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    Error: ${data.message}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
             pendingRequests.delete(data.request_id);
             break;
     }
@@ -84,7 +113,10 @@ socketPredefined.onmessage = function(event) {
                 const userMessage = pendingRequests.get(data.request_id) || "Unknown question";
                 chatMessages.append(`
                     <div class="message-container" id="container-${data.request_id}">
-                        <div class="message user-message fade-in">${userMessage}</div>
+                        <div class="message user-message fade-in">
+                            ${userMessage}
+                            <span class="timestamp">${formatTimestamp()}</span>
+                        </div>
                         <div class="thinking-animation" id="loader-${data.request_id}">
                             <div class="thinking-spinner"></div>
                             <div class="thinking-dot"></div>
@@ -97,24 +129,39 @@ socketPredefined.onmessage = function(event) {
             break;
         case "message":
             $(`#loader-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.content}</div>`);
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    ${data.content}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
             pendingRequests.delete(data.request_id);
             break;
         case "error":
             $(`#loader-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message text-danger fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    Error: ${data.message}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
             pendingRequests.delete(data.request_id);
             break;
         case "predefined_questions":
             // Handle the list of predefined questions from predefined.py
             if (!predefinedQuestionsAdded) {
+                predefinedQuestions = data.questions; // Store the fetched questions
                 chatMessages.append(`
                     <div class="message-container predefined-block animated-message">
                         <div class="message bot-message fade-in">
+                            <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                             <strong>I’m on it! Explore Impact Analytics insights in the meantime.</strong>
+                            <span class="timestamp">${formatTimestamp()}</span>
                         </div>
                         <div class="predefined-questions">
-                            ${data.questions.map((q, index) => `
+                            ${predefinedQuestions.map((q, index) => `
                                 <button class="btn btn-outline-secondary m-2 question-btn" onclick="sendPredefinedQuestion('${escapeSingleQuotes(q)}', '${data.request_id}')">${q}</button>
                             `).join('')}
                         </div>
@@ -136,7 +183,10 @@ function sendMessage() {
         if (!$(`#container-${requestId}`).length) {
             chatMessages.append(`
                 <div class="message-container" id="container-${requestId}">
-                    <div class="message user-message fade-in">${message}</div>
+                    <div class="message user-message fade-in">
+                        ${message}
+                        <span class="timestamp">${formatTimestamp()}</span>
+                    </div>
                     <div class="thinking-animation" id="loader-${requestId}">
                         <div class="thinking-spinner"></div>
                         <div class="thinking-dot"></div>
@@ -160,7 +210,10 @@ function sendPredefinedQuestion(question, parentRequestId) {
     if (!$(`#container-${requestId}`).length) {
         chatMessages.append(`
             <div class="message-container" id="container-${requestId}">
-                <div class="message user-message fade-in">${question}</div>
+                <div class="message user-message fade-in">
+                    ${question}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
                 <div class="thinking-animation" id="loader-${requestId}">
                     <div class="thinking-spinner"></div>
                     <div class="thinking-dot"></div>
@@ -261,30 +314,32 @@ function renderResults(data, requestId) {
     if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
         const currency = data.data.financial_data.currency || '';
         financialTable = `
-            <h4>Financial Data</h4>
-            <table class="table table-dark table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>Field</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${Object.entries(data.data.financial_data).map(([key, value]) => {
-                        const monetaryFields = ["balance_sheet_inventory_cost", "P&L_inventory_cost", "Revenue", "Salary Average", "gross_profit", "market_cap"];
-                        let displayValue = value || 'N/A';
-                        if (monetaryFields.includes(key) && value && value !== "Not Available") {
-                            displayValue = `${value}`;
-                        }
-                        return `
-                            <tr>
-                                <td>${key.replace(/_/g, ' ')}</td>
-                                <td>${displayValue}</td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
+            <div class="financial-content">
+                <h4>Financial Data</h4>
+                <table class="table table-dark table-striped mt-3">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(data.data.financial_data).map(([key, value]) => {
+                            const monetaryFields = ["balance_sheet_inventory_cost", "P&L_inventory_cost", "Revenue", "Salary Average", "gross_profit", "market_cap"];
+                            let displayValue = value || 'N/A';
+                            if (monetaryFields.includes(key) && value && value !== "Not Available") {
+                                displayValue = `${value}`;
+                            }
+                            return `
+                                <tr>
+                                    <td>${key.replace(/_/g, ' ')}</td>
+                                    <td>${displayValue}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
     }
 
@@ -292,25 +347,27 @@ function renderResults(data, requestId) {
     if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
         const currency = data.data.financial_data.currency || '';
         benefitsTable = `
-            <h4>Calculated Benefits</h4>
-            <table class="table table-dark table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>Benefit</th>
-                        <th>Low Estimate</th>
-                        <th>High Estimate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${Object.entries(data.data.benefits).map(([key, value]) => `
+            <div class="benefits-content">
+                <h4>Calculated Benefits</h4>
+                <table class="table table-dark table-striped mt-3">
+                    <thead>
                         <tr>
-                            <td>${key.replace(/_/g, ' ')}</td>
-                            <td>${value.low || 'N/A'}</td>
-                            <td>${value.high || 'N/A'}</td>
+                            <th>Benefit</th>
+                            <th>Low Estimate</th>
+                            <th>High Estimate</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(data.data.benefits).map(([key, value]) => `
+                            <tr>
+                                <td>${key.replace(/_/g, ' ')}</td>
+                                <td>${value.low || 'N/A'}</td>
+                                <td>${value.high || 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
 
         const labels = Object.keys(data.data.benefits);
@@ -319,17 +376,23 @@ function renderResults(data, requestId) {
 
         const canvasId = `benefitsChart_${Date.now()}`;
         barChart = `
-            <h4>Benefits Bar Graph</h4>
-            <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
+            <div class="chart-content">
+                <h4>Benefits Bar Graph</h4>
+                <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
+            </div>
         `;
 
         summary = data.data.summary || 'Financial benefits calculated.';
         $(`#container-${requestId}`).append(`
             <div class="message bot-message fade-in">
-                ${financialTable}
-                ${benefitsTable}
-                ${barChart}
-                <div class="summary mt-3">${summary}</div>
+                <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                <div class="message-content">
+                    ${financialTable}
+                    ${benefitsTable}
+                    ${barChart}
+                    <div class="summary mt-3">${summary}</div>
+                </div>
+                <span class="timestamp">${formatTimestamp()}</span>
             </div>
         `);
 
@@ -339,8 +402,12 @@ function renderResults(data, requestId) {
         summary = data.data.summary || 'No benefits calculated due to insufficient data.';
         $(`#container-${requestId}`).append(`
             <div class="message bot-message fade-in">
-                ${financialTable}
-                <div class="summary mt-3">${summary}</div>
+                <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                <div class="message-content">
+                    ${financialTable}
+                    <div class="summary mt-3">${summary}</div>
+                </div>
+                <span class="timestamp">${formatTimestamp()}</span>
             </div>
         `);
     }
