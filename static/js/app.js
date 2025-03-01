@@ -47,6 +47,7 @@ socketMain.onmessage = function(event) {
                             <div class="thinking-dot"></div>
                             <div class="thinking-dot"></div>
                             <div class="thinking-dot"></div>
+                            <span class="agent-info" id="agent-info-${data.request_id}"></span>
                         </div>
                     </div>
                 `);
@@ -61,8 +62,15 @@ socketMain.onmessage = function(event) {
             }
             chatMessages.scrollTop(chatMessages[0].scrollHeight);
             break;
+        case "agent_update":
+            const agentInfoElement = $(`#agent-info-${data.request_id}`);
+            if (agentInfoElement.length) {
+                agentInfoElement.text(`${data.tool}...`);
+            }
+            break;
         case "question":
             $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -73,6 +81,7 @@ socketMain.onmessage = function(event) {
             break;
         case "message":
             $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -84,11 +93,13 @@ socketMain.onmessage = function(event) {
             break;
         case "result":
             $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
             renderResults(data, data.request_id);
             pendingRequests.delete(data.request_id);
             break;
         case "error":
             $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message text-danger fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -192,6 +203,7 @@ function sendMessage() {
                         <div class="thinking-dot"></div>
                         <div class="thinking-dot"></div>
                         <div class="thinking-dot"></div>
+                        <span class="agent-info" id="agent-info-${requestId}"></span>
                     </div>
                 </div>
             `);

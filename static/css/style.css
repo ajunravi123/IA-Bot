@@ -122,6 +122,7 @@ body {
     align-items: center;
     gap: 5px;
     margin-bottom: 15px;
+    position: relative; /* Ensure positioning context for agent-info */
 }
 
 .thinking-spinner {
@@ -143,6 +144,14 @@ body {
 
 .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
 .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.agent-info {
+    font-size: 0.8rem;
+    color: #a0a0a0;
+    margin-left: 10px;
+    flex-shrink: 0;
+    white-space: nowrap; /* Prevent text wrapping */
+}
 
 /* Animations */
 @keyframes fadeInUp {
@@ -327,6 +336,11 @@ h1, h4 {
         right: 8px;
     }
 
+    .agent-info {
+        font-size: 0.7rem;
+        margin-left: 5px;
+    }
+
     .thinking-spinner {
         width: 16px;
         height: 16px;
@@ -405,6 +419,10 @@ h1, h4 {
         font-size: 0.5rem; /* Even smaller on very small screens */
     }
 
+    .agent-info {
+        font-size: 0.6rem;
+    }
+
     .predefined-questions .question-btn {
         font-size: 0.7rem;
     }
@@ -427,3 +445,4 @@ h1, h4 {
     color: #e0e0e0;
     box-shadow: 0 0 8px rgba(81, 116, 255, 0.5);
 }
+

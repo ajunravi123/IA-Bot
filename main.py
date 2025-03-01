@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from crewai import Crew, Process
+from crewai import Crew, Process, Agent
 from agents import DataCollectorAgent, DataFormatterAgent, SummaryGeneratorAgent, BenefitCalculatorAgent
 from tools import FinanceTools
 import json
@@ -33,6 +33,15 @@ def fix_json_string(json_str):
     # Remove any escaped single quotes that shouldn’t be there
     json_str = json_str.replace("\\'", "'")
     return json_str
+
+async def send_agent_update(websocket: WebSocket, agent_name: str, tool_name: str, request_id: str):
+    """Send an update about the current agent and tool being used."""
+    await websocket.send_json({
+        "type": "agent_update",
+        "agent": agent_name,
+        "tool": tool_name,
+        "request_id": request_id
+    })
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -72,7 +81,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         verbose=True
                     )
                     
+                    # Send agent updates during first crew execution
+                    await send_agent_update(websocket, "DataCollectorAgent", "Collecting financial data", request_id)
                     first_result = first_crew.kickoff()
+                    await send_agent_update(websocket, "DataFormatterAgent", "Analyising the collected data", request_id)
                     
                     collector_output = first_result.tasks_output[0].raw
                     formatter_output = first_result.tasks_output[1].raw
@@ -135,7 +147,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         verbose=True
                     )
                     
+                    # Send agent updates during second crew execution
+                    await send_agent_update(websocket, "BenefitCalculatorAgent", "Calculating the benefit", request_id)
                     second_result = second_crew.kickoff()
+                    await send_agent_update(websocket, "SummaryGeneratorAgent", "Generating summary", request_id)
                     
                     calculator_output = second_result.tasks_output[0].raw
                     summary_output = second_result.tasks_output[1].raw
