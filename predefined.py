@@ -11,11 +11,13 @@ app = FastAPI()
 
 # Predefined answers and their questions
 predefined_answers = {
-    "What is the market cap of Tesla?": "Tesla's market cap is approximately $1 trillion as of early 2025.",
-    "How does Apple's revenue compare to last year?": "Apple's revenue grew by 5% compared to last year, reaching $394 billion.",
-    "What are the latest financials for Microsoft?": "Microsoft reported revenue of $62 billion in its latest quarter, with a net income of $22 billion.",
-    "Can you analyze Amazon's gross profit?": "Amazon's gross profit for the latest period was $75 billion, up 10% year-over-year.",
-    "What is the headcount of Google?": "Google's headcount is around 180,000 employees as of 2025."
+    "What we are doing?": """Impact Analytics delivers AI-native SaaS solutions and consulting services that help companies maximize profitability and customer satisfaction through deeper data insights and predictive analytics. 
+
+    With a fully integrated, end-to-end platform for planning, forecasting, merchandising, pricing, and promotions, Impact Analytics empowers companies to make smarter decisions based on real-time insights, rather than relying on last year’s inputs to forecast and plan this year’s business.""",
+    "How Agentic AI reshaping Retail industry?": """AI agents are redefining how businesses and individuals operate, innovate, and succeed. At the forefront of this technological revolution, our AI-native solutions empower you to achieve more with less effort. Partner with Impact Analytics and seize the opportunity to grow and stay ahead of your competition.""",
+    "Why Impact Analytics?": """We are in the midst of a data revolution. Intelligent automation platforms are finally becoming affordable for businesses, but the Impact Analytics platform is the only one that does it all. Our cutting-edge AI solutions are complete, fully integrated, and built to boost revenues and profits.""",
+    "Brief a bit about Pricesmart?": """AI-powered Impact Analytics PriceSmart™ uncovers underlying insights, the latest trends, price elasticities, competitor pricing, and more, driving the initial (or base), promotional, and markdown and clearance pricing decisions that maximize profitability.""",
+    "Schedule a Consultation": "Thank you for showing your interest. Our team will reach you soon."
 }
 
 def unescape_single_quotes(str):

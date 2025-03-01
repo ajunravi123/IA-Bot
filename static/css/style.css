@@ -6,11 +6,20 @@ body {
 
 /* Logo Animation */
 .logo-container {
-    position: absolute;
+    margin-top: 17px;
+    margin-left: 18px;
+    /* align-content: revert; */
+    /* position: absolute; */
+    top: 20px;
+    /* left: 20px; */
+    animation: glow 8s infinite alternate;
+    /* position: absolute;
     top: 20px;
     left: 20px;
-    animation: glow 2s infinite alternate;
+    animation: glow 2s infinite alternate; */
 }
+
+
 
 @keyframes glow {
     0% { filter: drop-shadow(0 0 5px rgba(81, 116, 255, 0.5)); }
@@ -33,7 +42,7 @@ body {
 
 /* Chat Messages */
 #chat-messages {
-    height: 600px;
+    height: 450px;
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: thin;
@@ -446,3 +455,21 @@ h1, h4 {
     box-shadow: 0 0 8px rgba(81, 116, 255, 0.5);
 }
 
+.headlab{
+    padding-bottom: 17px;
+}
+
+.head-lab-icon {
+    width: 46px;
+    border-radius: 67%;
+}
+
+.head-lab-txt {
+    margin-left: 10px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.ia {
+    color: #2b8dff;
+}

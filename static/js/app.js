@@ -169,7 +169,6 @@ socketPredefined.onmessage = function(event) {
                         <div class="message bot-message fade-in">
                             <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                             <strong>I’m on it! Explore Impact Analytics insights in the meantime.</strong>
-                            <span class="timestamp">${formatTimestamp()}</span>
                         </div>
                         <div class="predefined-questions">
                             ${predefinedQuestions.map((q, index) => `
