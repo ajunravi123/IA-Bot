@@ -345,7 +345,7 @@ h1, h4 {
     }
 
     #chat-messages {
-        height: 40vh; /* Reduced height to make room for input on mobile */
+        height: 45vh; /* Increased height for tablets */
         padding: 10px;
     }
 
@@ -384,7 +384,7 @@ h1, h4 {
     .input-group {
         background: #222841; /* Darker for mobile consistency */
         color: #d0d4ff;
-        flex-direction: row; /* Changed to row for side-by-side layout on mobile */
+        flex-direction: row; /* Side by side on mobile */
         padding: 5px; /* Adjusted padding for better fit */
         align-items: center; /* Align items vertically in the row */
     }
@@ -475,7 +475,7 @@ h1, h4 {
     }
 
     #chat-messages {
-        height: 35vh; /* Further reduced height to ensure input visibility */
+        height: 50vh; /* Increased height for phones */
         padding: 5px; /* Reduced padding for phones */
     }
 
@@ -498,7 +498,7 @@ h1, h4 {
 
     .input-group {
         padding: 3px; /* Even less padding for phones */
-        flex-direction: row; /* Changed to row for side-by-side layout on phones */
+        flex-direction: row; /* Side by side on phones */
         align-items: center; /* Align items vertically in the row */
     }
 
