@@ -1,57 +1,181 @@
-const socket = new WebSocket(`ws://${window.location.host}/ws`);
+// WebSocket for user input (port 8000)
+const socketMain = new WebSocket(`ws://${window.location.host}/ws`);
+// WebSocket for predefined questions (port 8001)
+const socketPredefined = new WebSocket(`ws://${window.location.host.replace(':8000', ':8001')}/ws`);
 const chatMessages = $("#chat-messages");
 
-socket.onmessage = function(event) {
+// Predefined questions to engage the user
+const predefinedQuestions = [
+    "What is the market cap of Tesla?",
+    "How does Apple's revenue compare to last year?",
+    "What are the latest financials for Microsoft?",
+    "Can you analyze Amazon's gross profit?",
+    "What is the headcount of Google?"
+];
+
+// Track if first user input has been sent and if predefined questions are added
+let firstInputSent = false;
+let predefinedQuestionsAdded = false; // Flag to track if questions are already added
+// Store pending requests with unique IDs
+const pendingRequests = new Map();
+
+// Debug logging
+console.log("Opening WebSocket connections...");
+socketMain.onopen = () => console.log("Main WebSocket (port 8000) opened at", new Date().toISOString());
+socketPredefined.onopen = () => console.log("Predefined WebSocket (port 8001) opened at", new Date().toISOString());
+
+socketMain.onmessage = function(event) {
     const data = JSON.parse(event.data);
+    console.log(`Main WS (8000) received at ${new Date().toISOString()}:`, data, "Request ID:", data.request_id);
     
     switch(data.type) {
         case "thinking":
-            $(".thinking-animation").remove();
-            chatMessages.append(`
-                <div class="thinking-animation">
-                    <div class="thinking-spinner"></div>
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                </div>
-            `);
+            // Check if this question is already in the DOM to prevent duplicates
+            if (!$(`#container-${data.request_id}`).length) {
+                const userMessage = pendingRequests.get(data.request_id);
+                if (!userMessage) {
+                    console.warn(`No message found for request_id: ${data.request_id}`);
+                }
+                chatMessages.append(`
+                    <div class="message-container" id="container-${data.request_id}">
+                        <div class="message user-message fade-in">${userMessage || "Unknown question"}</div>
+                        <div class="thinking-animation" id="loader-${data.request_id}">
+                            <div class="thinking-spinner"></div>
+                            <div class="thinking-dot"></div>
+                            <div class="thinking-dot"></div>
+                            <div class="thinking-dot"></div>
+                        </div>
+                    </div>
+                `);
+            }
+            // Show predefined questions only after first user input and if not already added
+            if (!firstInputSent) {
+                firstInputSent = true;
+                if (!predefinedQuestionsAdded) {
+                    chatMessages.append(`
+                        <div class="predefined-questions">
+                            ${predefinedQuestions.map((q, index) => `
+                                <button class="btn btn-outline-secondary m-2 question-btn" onclick="sendPredefinedQuestion('${escapeSingleQuotes(q)}', '${data.request_id}')">${q}</button>
+                            `).join('')}
+                        </div>
+                    `);
+                    predefinedQuestionsAdded = true; // Mark as added to prevent duplicates
+                }
+            }
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
             break;
         case "question":
-            chatMessages.append(`<div class="message bot-message fade-in">${data.message}</div>`);
+            $(`#loader-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.message}</div>`);
             break;
         case "message":
-            $(".thinking-animation").remove();
-            chatMessages.append(`<div class="message bot-message fade-in">${data.content}</div>`);
+            $(`#loader-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.content}</div>`);
+            pendingRequests.delete(data.request_id);
             break;
         case "result":
-            $(".thinking-animation").remove();
-            renderResults(data);
+            $(`#loader-${data.request_id}`).remove();
+            renderResults(data, data.request_id);
+            pendingRequests.delete(data.request_id);
             break;
         case "error":
-            $(".thinking-animation").remove();
-            chatMessages.append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
+            $(`#loader-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
+            pendingRequests.delete(data.request_id);
             break;
     }
-    chatMessages.scrollTop(chatMessages[0].scrollHeight);
+};
+
+socketPredefined.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log(`Predefined WS (8001) received at ${new Date().toISOString()}:`, data, "Request ID:", data.request_id);
+    
+    switch(data.type) {
+        case "thinking":
+            // Check if this question is already in the DOM to prevent duplicates
+            if (!$(`#container-${data.request_id}`).length) {
+                const userMessage = pendingRequests.get(data.request_id) || "Unknown question";
+                chatMessages.append(`
+                    <div class="message-container" id="container-${data.request_id}">
+                        <div class="message user-message fade-in">${userMessage}</div>
+                        <div class="thinking-animation" id="loader-${data.request_id}">
+                            <div class="thinking-spinner"></div>
+                            <div class="thinking-dot"></div>
+                            <div class="thinking-dot"></div>
+                            <div class="thinking-dot"></div>
+                        </div>
+                    </div>
+                `);
+            }
+            break;
+        case "message":
+            $(`#loader-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`<div class="message bot-message fade-in">${data.content}</div>`);
+            pendingRequests.delete(data.request_id);
+            break;
+        case "error":
+            $(`#loader-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
+            pendingRequests.delete(data.request_id);
+            break;
+    }
 };
 
 function sendMessage() {
     const input = $("#user-input");
     const message = input.val().trim();
     if (message) {
-        chatMessages.append(`<div class="message user-message fade-in">${message}</div>`);
-        socket.send(message);
-        chatMessages.append(`
-            <div class="thinking-animation">
-                <div class="thinking-spinner"></div>
-                <div class="thinking-dot"></div>
-                <div class="thinking-dot"></div>
-                <div class="thinking-dot"></div>
-            </div>
-        `);
+        const requestId = Date.now().toString();
+        // Check if this question is already in the DOM to prevent duplicates
+        if (!$(`#container-${requestId}`).length) {
+            chatMessages.append(`
+                <div class="message-container" id="container-${requestId}">
+                    <div class="message user-message fade-in">${message}</div>
+                    <div class="thinking-animation" id="loader-${requestId}">
+                        <div class="thinking-spinner"></div>
+                        <div class="thinking-dot"></div>
+                        <div class="thinking-dot"></div>
+                        <div class="thinking-dot"></div>
+                    </div>
+                </div>
+            `);
+            socketMain.send(JSON.stringify({ type: "user_input", content: message, request_id: requestId }));
+            pendingRequests.set(requestId, message);
+        }
         chatMessages.scrollTop(chatMessages[0].scrollHeight);
         input.val("");
     }
+}
+
+function sendPredefinedQuestion(question, parentRequestId) {
+    const requestId = Date.now().toString();
+    // Escape single quotes and check for duplicates
+    const escapedQuestion = escapeSingleQuotes(question);
+    if (!$(`#container-${requestId}`).length) {
+        chatMessages.append(`
+            <div class="message-container" id="container-${requestId}">
+                <div class="message user-message fade-in">${question}</div>
+                <div class="thinking-animation" id="loader-${requestId}">
+                    <div class="thinking-spinner"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                </div>
+            </div>
+        `);
+    }
+    socketPredefined.send(JSON.stringify({ type: "predefined_question", content: escapedQuestion, request_id: requestId, parent_request_id: parentRequestId }));
+    pendingRequests.set(requestId, question);
+    chatMessages.scrollTop(chatMessages[0].scrollHeight);
+}
+
+// Function to escape single quotes and other special characters for JSON safety
+function escapeSingleQuotes(str) {
+    return str
+        .replace(/'/g, "\\'")  // Escape single quotes
+        .replace(/"/g, '\\"')  // Escape double quotes
+        .replace(/\n/g, '\\n') // Escape newlines
+        .replace(/\r/g, '\\r'); // Escape carriage returns
 }
 
 function parseBenefitValue(value) {
@@ -63,7 +187,6 @@ function parseBenefitValue(value) {
     return num * (suffix === 'B' ? 1e9 : suffix === 'M' ? 1e6 : suffix === 'K' ? 1e3 : 1);
 }
 
-// Store Chart instances to manage them
 const chartInstances = new Map();
 
 function createBarChart(canvasId, labels, lowValues, highValues, currency) {
@@ -122,7 +245,7 @@ function createBarChart(canvasId, labels, lowValues, highValues, currency) {
     chartInstances.set(canvasId, newChart);
 }
 
-function renderResults(data) {
+function renderResults(data, requestId) {
     let financialTable = '';
     let benefitsTable = '';
     let barChart = '';
@@ -184,40 +307,37 @@ function renderResults(data) {
             </table>
         `;
 
-        // Prepare data for bar chart
         const labels = Object.keys(data.data.benefits);
         const lowValues = labels.map(key => parseBenefitValue(data.data.benefits[key].low));
         const highValues = labels.map(key => parseBenefitValue(data.data.benefits[key].high));
 
-        // Create unique canvas ID
         const canvasId = `benefitsChart_${Date.now()}`;
         barChart = `
             <h4>Benefits Bar Graph</h4>
             <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
         `;
 
-        // Append content first, then create the chart
-        chatMessages.append(`
+        summary = data.data.summary || 'Financial benefits calculated.';
+        $(`#container-${requestId}`).append(`
             <div class="message bot-message fade-in">
                 ${financialTable}
                 ${benefitsTable}
                 ${barChart}
-                <div class="summary mt-3">${data.data.summary || 'Financial benefits calculated.'}</div>
+                <div class="summary mt-3">${summary}</div>
             </div>
         `);
 
         // Initialize the chart after appending
         createBarChart(canvasId, labels, lowValues, highValues, currency);
     } else {
-        chatMessages.append(`
+        summary = data.data.summary || 'No benefits calculated due to insufficient data.';
+        $(`#container-${requestId}`).append(`
             <div class="message bot-message fade-in">
                 ${financialTable}
-                <div class="summary mt-3">No benefits calculated due to insufficient data.</div>
+                <div class="summary mt-3">${summary}</div>
             </div>
         `);
     }
-
-    chatMessages.scrollTop(chatMessages[0].scrollHeight);
 }
 
 $("#user-input").keypress(function(e) {

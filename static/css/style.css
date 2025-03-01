@@ -53,6 +53,11 @@ body {
     border-radius: 4px;
 }
 
+.message-container {
+    margin-bottom: 15px;
+    position: relative;
+}
+
 .message {
     margin-bottom: 15px;
     padding: 12px 18px;
@@ -181,6 +186,11 @@ h1, h4 {
     font-family: sans-serif;
 }
 
+/* Predefined Questions */
+.predefined-questions {
+    margin-top: 20px;
+}
+
 /* Mobile Responsiveness (below 768px) */
 @media (max-width: 768px) {
     body {
@@ -252,6 +262,12 @@ h1, h4 {
         font-size: 0.8rem;
     }
 
+    .predefined-questions .question-btn {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        margin: 2px 0;
+    }
+
     canvas {
         width: 100% !important;
         max-width: 100%;
@@ -271,4 +287,26 @@ h1, h4 {
     .message {
         font-size: 0.85rem;
     }
+
+    .predefined-questions .question-btn {
+        font-size: 0.7rem;
+    }
+}
+
+/* Question Button Styling */
+.question-btn {
+    background: #3a4a9f;
+    border: 1px solid #5174ff;
+    color: #d0d4ff;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 5px 0;
+    transition: background 0.3s, color 0.3s;
+}
+
+.question-btn:hover {
+    background: #5174ff;
+    color: #e0e0e0;
+    box-shadow: 0 0 8px rgba(81, 116, 255, 0.5);
 }
