@@ -7,8 +7,9 @@ body {
 
 /* Logo Animation */
 .logo-container {
+    text-align: right;
+    margin-right: 20px;
     margin-top: 17px;
-    margin-left: 18px;
     /* align-content: revert; */
     /* position: absolute; */
     top: 20px;
