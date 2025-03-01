@@ -36,7 +36,7 @@ async def websocket_predefined(websocket: WebSocket):
             message_type = data.get("type")
             content = data.get("content")
             request_id = data.get("request_id", "unknown")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.6)
 
             # Send "thinking" message for predefined questions
             if message_type == "predefined_question":
