@@ -1,5 +1,6 @@
 body {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: #e8f7fd;
+    /* background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); */
     color: #e0e0e0;
     font-family: 'Humanist', sans-serif; /* Futuristic font */
 }
@@ -28,7 +29,8 @@ body {
 
 /* Chat Container */
 #chat-container {
-    background: rgba(34, 40, 65, 0.9);
+    background: rgb(255 255 255 / 90%);
+    /* background: rgba(34, 40, 65, 0.9); */
     border: 1px solid #3a4a9f;
     border-radius: 15px;
     box-shadow: 0 0 20px rgba(81, 116, 255, 0.3);
@@ -94,8 +96,10 @@ body {
 }
 
 .bot-message {
-    background: #2a3265;
-    color: #d0d4ff;
+    background: #b9bfe4;
+    color: #000000;
+    /* background: #2a3265; */
+    /* color: #d0d4ff; */
     border: 1px solid #3a4a9f;
     display: flex;
     align-items: flex-start;
@@ -468,6 +472,7 @@ h1, h4 {
     margin-left: 10px;
     font-size: 18px;
     font-weight: 600;
+    color: #000000;
 }
 
 .ia {
