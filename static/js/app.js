@@ -4,15 +4,6 @@ const socketMain = new WebSocket(`ws://${window.location.host}/ws`);
 const socketPredefined = new WebSocket(`ws://${window.location.host.replace(':8000', ':8001')}/ws`);
 const chatMessages = $("#chat-messages");
 
-// Predefined questions to engage the user
-const predefinedQuestions = [
-    "What is the market cap of Tesla?",
-    "How does Apple's revenue compare to last year?",
-    "What are the latest financials for Microsoft?",
-    "Can you analyze Amazon's gross profit?",
-    "What is the headcount of Google?"
-];
-
 // Track if first user input has been sent and if predefined questions are added
 let firstInputSent = false;
 let predefinedQuestionsAdded = false; // Flag to track if questions are already added
@@ -24,6 +15,7 @@ console.log("Opening WebSocket connections...");
 socketMain.onopen = () => console.log("Main WebSocket (port 8000) opened at", new Date().toISOString());
 socketPredefined.onopen = () => console.log("Predefined WebSocket (port 8001) opened at", new Date().toISOString());
 
+// Handle messages from socketMain (port 8000)
 socketMain.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log(`Main WS (8000) received at ${new Date().toISOString()}:`, data, "Request ID:", data.request_id);
@@ -48,18 +40,12 @@ socketMain.onmessage = function(event) {
                     </div>
                 `);
             }
-            // Show predefined questions only after first user input and if not already added
+            // Show predefined questions block only after first user input and if not already added
             if (!firstInputSent) {
                 firstInputSent = true;
                 if (!predefinedQuestionsAdded) {
-                    chatMessages.append(`
-                        <div class="predefined-questions">
-                            ${predefinedQuestions.map((q, index) => `
-                                <button class="btn btn-outline-secondary m-2 question-btn" onclick="sendPredefinedQuestion('${escapeSingleQuotes(q)}', '${data.request_id}')">${q}</button>
-                            `).join('')}
-                        </div>
-                    `);
-                    predefinedQuestionsAdded = true; // Mark as added to prevent duplicates
+                    // Request predefined questions from predefined.py
+                    socketPredefined.send(JSON.stringify({ type: "fetch_predefined_questions", request_id: data.request_id }));
                 }
             }
             chatMessages.scrollTop(chatMessages[0].scrollHeight);
@@ -86,6 +72,7 @@ socketMain.onmessage = function(event) {
     }
 };
 
+// Handle messages from socketPredefined (port 8001)
 socketPredefined.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log(`Predefined WS (8001) received at ${new Date().toISOString()}:`, data, "Request ID:", data.request_id);
@@ -117,6 +104,25 @@ socketPredefined.onmessage = function(event) {
             $(`#loader-${data.request_id}`).remove();
             $(`#container-${data.request_id}`).append(`<div class="message bot-message text-danger fade-in">Error: ${data.message}</div>`);
             pendingRequests.delete(data.request_id);
+            break;
+        case "predefined_questions":
+            // Handle the list of predefined questions from predefined.py
+            if (!predefinedQuestionsAdded) {
+                chatMessages.append(`
+                    <div class="message-container predefined-block animated-message">
+                        <div class="message bot-message fade-in">
+                            <strong>I’m on it! Explore Impact Analytics insights in the meantime.</strong>
+                        </div>
+                        <div class="predefined-questions">
+                            ${data.questions.map((q, index) => `
+                                <button class="btn btn-outline-secondary m-2 question-btn" onclick="sendPredefinedQuestion('${escapeSingleQuotes(q)}', '${data.request_id}')">${q}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `);
+                predefinedQuestionsAdded = true; // Mark as added to prevent duplicates
+                chatMessages.scrollTop(chatMessages[0].scrollHeight);
+            }
             break;
     }
 };

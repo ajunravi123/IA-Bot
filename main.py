@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from crewai import Crew, Process
@@ -40,9 +40,18 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
+            print(f"Raw input received: {data}")  # Debug log for raw input
             company_input = data.strip()
+            # Parse JSON to extract request_id (assuming data is JSON from app.js)
+            try:
+                data_dict = json.loads(company_input)
+                request_id = data_dict.get("request_id", str(time.time()))
+            except json.JSONDecodeError:
+                request_id = str(time.time())  # Fallback if not JSON or no request_id
+            print(f"Parsed Request ID: {request_id}")  # Debug log for request_id
             
-            await websocket.send_json({"type": "thinking", "status": True})
+            # Send initial "thinking" with request_id
+            await websocket.send_json({"type": "thinking", "request_id": request_id})
             
             retries = 0
             while retries < MAX_RETRIES:
@@ -72,7 +81,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         if "Error" in collector_output or "inventory-based" in collector_output or "No data available" in collector_output:
                             await websocket.send_json({
                                 "type": "message",
-                                "content": collector_output
+                                "content": collector_output,
+                                "request_id": request_id
                             })
                             break
                         json_match = re.search(r'\{.*\}', collector_output, re.DOTALL)
@@ -86,13 +96,15 @@ async def websocket_endpoint(websocket: WebSocket):
                                 print(f"Failed to parse collector_output: {collector_output}, Error: {e}")
                                 await websocket.send_json({
                                     "type": "message",
-                                    "content": f"Error parsing financial data: {collector_output}"
+                                    "content": f"Error parsing financial data: {collector_output}",
+                                    "request_id": request_id
                                 })
                                 break
                         else:
                             await websocket.send_json({
                                 "type": "message",
-                                "content": collector_output
+                                "content": collector_output,
+                                "request_id": request_id
                             })
                             break
                     else:
@@ -150,7 +162,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             "financial_data": financial_data,
                             "benefits": benefits,
                             "summary": summary
-                        }
+                        },
+                        "request_id": request_id
                     })
                     break
                 
@@ -159,17 +172,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     if retries == MAX_RETRIES:
                         await websocket.send_json({
                             "type": "error",
-                            "message": f"Failed after {MAX_RETRIES} attempts: {str(e)}"
+                            "message": f"Failed after {MAX_RETRIES} attempts: {str(e)}",
+                            "request_id": request_id
                         })
                     else:
                         await websocket.send_json({
                             "type": "message",
-                            "content": f"Retry attempt {retries + 1}/{MAX_RETRIES} due to error: {str(e)}"
+                            "content": f"Retry attempt {retries + 1}/{MAX_RETRIES} due to error: {str(e)}",
+                            "request_id": request_id
                         })
-                        await websocket.send_json({"type": "thinking", "status": True})
+                        await websocket.send_json({"type": "thinking", "request_id": request_id})
                         time.sleep(2)
             
+    except WebSocketDisconnect as e:
+        print(f"WebSocket disconnected: {str(e)}")
+        await websocket.send_json({"type": "error", "message": "WebSocket connection closed", "request_id": "unknown"})
     except Exception as e:
-        await websocket.send_json({"type": "error", "message": str(e)})
+        print(f"WebSocket error: {str(e)}")
+        await websocket.send_json({"type": "error", "message": str(e), "request_id": "unknown"})
     finally:
         await websocket.close()

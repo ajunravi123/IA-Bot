@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Predefined answers
+# Predefined answers and their questions
 predefined_answers = {
     "What is the market cap of Tesla?": "Tesla's market cap is approximately $1 trillion as of early 2025.",
     "How does Apple's revenue compare to last year?": "Apple's revenue grew by 5% compared to last year, reaching $394 billion.",
@@ -35,18 +35,23 @@ async def websocket_predefined(websocket: WebSocket):
             content = data.get("content")
             request_id = data.get("request_id", "unknown")
 
-            # Unescape the content to match predefined answers
-            normalized_content = unescape_single_quotes(content)
-
-            # Send "thinking" message
-            await websocket.send_json({"type": "thinking", "request_id": request_id})
-
+            # Send "thinking" message for predefined questions
             if message_type == "predefined_question":
-                # Fast response for predefined questions
+                await websocket.send_json({"type": "thinking", "request_id": request_id})
+                # Normalize the content to match predefined answers
+                normalized_content = unescape_single_quotes(content)
                 answer = predefined_answers.get(normalized_content, "No predefined answer available.")
                 await asyncio.sleep(0.5)  # Minimal delay for realism
                 logger.debug(f"Predefined WS (8001) sending message at {asyncio.get_event_loop().time()} for {request_id}")
                 await websocket.send_json({"type": "message", "content": answer, "request_id": request_id})
+            elif message_type == "fetch_predefined_questions":
+                # Return the list of predefined questions (keys from predefined_answers)
+                questions = list(predefined_answers.keys())
+                await websocket.send_json({
+                    "type": "predefined_questions",
+                    "questions": questions,
+                    "request_id": request_id
+                })
             else:
                 await websocket.send_json({"type": "error", "message": "Invalid message type", "request_id": request_id})
     except WebSocketDisconnect:
