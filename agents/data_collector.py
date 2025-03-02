@@ -135,10 +135,12 @@ class DataCollectorAgent:
             return {"error": f"Unexpected task output format for '{company_input}' after {attempt} attempts - received: {task_output}"}
 
         description = (
-            "Process the input '" + company_input + "' to collect financial data for an inventory-based company in English only using Yahoo Finance as the primary source. Follow these steps:\n\n"
-            "1. **Find Ticker Symbol**: Use TickerLookupTool to determine the ticker symbol for '" + company_input + "'. If '" + company_input + "' is a ticker (1-5 uppercase letters, e.g., 'AAPL'), validate it. If it’s a company name (e.g., 'Tesla Inc.'), find its ticker. The tool will return a string like \"This is the ticker for '" + company_input + "': [ticker]\" (e.g., \"This is the ticker for 'Tesla Inc.': TSLA\"). Extract the ticker symbol (e.g., 'TSLA') from the response. If the ticker cannot be found (e.g., \"Error: No ticker found for '" + company_input + "'\"), use the callback to retry up to " + str(max_retries) + " times before stopping.\n\n"
-            "2. **Verify Inventory Status**: Use InventoryCompanyChecker with the ticker from step 1 to confirm the company is inventory-based (has significant inventory on its balance sheet or operates in sectors like consumer goods, industrial, retail, or manufacturing). If not inventory-based, return only the string: \"This application is designed for inventory-based companies only. '" + company_input + "' does not appear to be inventory-based\" and stop processing.\n\n"
-            "3. **Collect Financial Data**: If the company is inventory-based, gather data in JSON format with these required fields in English using YahooFinanceDataFetcher:\n"
+            "Process the input '" + company_input + "' to collect financial data for an inventory-based company in English only using multiple tools, with Yahoo Finance as the primary source. Follow these steps:\n\n"
+            "1. **Search Company**: Use SearchCompanyTool to search for '" + company_input + "' and identify potential company matches. If '" + company_input + "' is ambiguous (e.g., a partial name or multiple matches), return a list of possible companies (e.g., \"Possible matches for '" + company_input + "': [Company1, Company2]\"). Extract the most likely company name or ticker (if clear) or prompt the user via callback to specify the correct company. If no matches are found, use the callback to retry up to " + str(max_retries) + " times before stopping.\n\n"
+            "2. **Find Ticker Symbol**: Use TickerLookupTool to determine the ticker symbol for the identified company or '" + company_input + "'. If '" + company_input + "' is a ticker (1-5 uppercase letters, e.g., 'AAPL'), validate it. If it’s a company name (e.g., 'Tesla Inc.'), find its ticker. The tool will return a string like \"This is the ticker for '" + company_input + "': [ticker]\" (e.g., \"This is the ticker for 'Tesla Inc.': TSLA\"). Extract the ticker symbol (e.g., 'TSLA') from the response. If the ticker cannot be found (e.g., \"Error: No ticker found for '" + company_input + "'\"), use the callback to retry up to " + str(max_retries) + " times before stopping.\n\n"
+            "3. **Verify Inventory Status**: Use InventoryCompanyChecker with the ticker from step 2 to confirm the company is inventory-based (has significant inventory on its balance sheet or operates in sectors like consumer goods, industrial, retail, or manufacturing). If not inventory-based, return only the string: \"This application is designed for inventory-based companies only. '" + company_input + "' does not appear to be inventory-based\" and stop processing.\n\n"
+            "4. **Read Local Financial Data (Optional)**: Use FileReadTool to check for any locally stored financial data related to the ticker or company from step 2. If local data exists (e.g., JSON or CSV files), extract relevant fields ('company', 'analized_data_date', 'balance_sheet_inventory_cost', 'P&L_inventory_cost', 'Revenue', 'Headcount Old', 'Salary Average', 'gross_profit', 'gross_profit_percentage', 'market_cap', 'currency') and supplement or validate with online data. If no local data is available, proceed to online sources.\n\n"
+            "5. **Collect Financial Data**: If the company is inventory-based, gather data in JSON format with these required fields in English using YahooFinanceDataFetcher as the primary source, supplemented by AlphaVantageDataFetcher if needed:\n"
             "   - \"company\": The ticker symbol (e.g., 'TSLA').\n"
             "   - \"analized_data_date\": Date of the latest inventory data (e.g., '2023-12-31').\n"
             "   - \"balance_sheet_inventory_cost\": Inventory value from balance sheet (e.g., '200 million' or number).\n"
@@ -151,13 +153,15 @@ class DataCollectorAgent:
             "   - \"market_cap\": Market capitalization (e.g., '$850 billion' or number).\n"
             "   - \"currency\": Currency type of the financial data (e.g., 'USD').\n"
             "   Values can be numbers or strings with units (e.g., '$200 million', '300 billion'). If a field is unavailable, set it to \"Not Available\". Use AlphaVantageDataFetcher to supplement missing data if necessary.\n\n"
-            "4. **Handle Missing Data**: If any required fields are missing or set to \"Not Available\", use the callback to retry data collection up to " + str(max_retries) + " times or prompt the user for those values in English after retries fail. If all fields remain \"Not Available\" after retries, the callback will return a message indicating no data is available.\n\n"
+            "6. **Handle Missing Data**: If any required fields are missing or set to \"Not Available\", use the callback to retry data collection up to " + str(max_retries) + " times or prompt the user for those values in English after retries fail. If all fields remain \"Not Available\" after retries, the callback will return a message indicating no data is available.\n\n"
             "**Available Tools**:\n"
+            "- **SearchCompanyTool**: Searches for company names or tickers and returns possible matches or the most likely company/ticker.\n"
             "- **TickerLookupTool**: Returns a string with the ticker symbol (e.g., \"This is the ticker for 'Tesla Inc.': TSLA\").\n"
             "- **YahooFinanceDataFetcher**: Fetches financial data from Yahoo Finance, including currency type.\n"
             "- **AlphaVantageDataFetcher**: Fetches financial data from Alpha Vantage to supplement Yahoo Finance.\n"
-            "- **InventoryCompanyChecker**: Checks if the company is inventory-based.\n\n"
-            "**Output**: Return only a JSON object with the collected financial data ('company', 'analized_data_date', 'balance_sheet_inventory_cost', 'P&L_inventory_cost', 'Revenue', 'Headcount Old', 'Salary Average', 'gross_profit', 'gross_profit_percentage', 'market_cap', 'currency') in English, derived from actual data fetched by YahooFinanceDataFetcher and AlphaVantageDataFetcher. Do not calculate benefits or use example values—return only the raw collected data with currency information."
+            "- **InventoryCompanyChecker**: Checks if the company is inventory-based.\n"
+            "- **FileReadTool**: Reads locally stored financial data (e.g., JSON, CSV) related to the company or ticker.\n\n"
+            "**Output**: Return only a JSON object with the collected financial data ('company', 'analized_data_date', 'balance_sheet_inventory_cost', 'P&L_inventory_cost', 'Revenue', 'Headcount Old', 'Salary Average', 'gross_profit', 'gross_profit_percentage', 'market_cap', 'currency') in English, derived from actual data fetched by YahooFinanceDataFetcher, AlphaVantageDataFetcher, and optionally supplemented by FileReadTool and SearchCompanyTool. Do not calculate benefits or use example values—return only the raw collected data with currency information."
         )
 
         return Task(
@@ -168,6 +172,8 @@ class DataCollectorAgent:
                 finance_tools.ticker_lookup_tool,
                 finance_tools.yfinance_tool,
                 finance_tools.alpha_vantage_tool,
+                finance_tools.file_read_tool,
+                finance_tools.search_company_tool,
                 finance_tools.inventory_check_tool
             ],
             callback=lambda output: collect_missing_data(output, 1)
