@@ -79,6 +79,19 @@ socketMain.onmessage = function(event) {
                 </div>
             `);
             break;
+        case "question_result":  // New case for question responses
+            $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove();
+            $(`#container-${data.request_id}`).append(`
+                <div class="message bot-message fade-in">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    ${data.data.matched_paragraphs}
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
+            pendingRequests.delete(data.request_id);
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
+            break;
         case "message":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
