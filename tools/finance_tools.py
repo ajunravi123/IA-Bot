@@ -329,10 +329,10 @@ class FinanceTools:
     def __init__(self):
         self.alpha_vantage_key = os.getenv("ALPHA_VANTAGE_API_KEY")
         self.ts = TimeSeries(key=self.alpha_vantage_key)
-        self.file_read_tool = FileReadTool()
+        self.file_read_tool = FileReadTool() #enabled
         self.yfinance_tool = YFinanceTool()
         self.alpha_vantage_tool = AlphaVantageTool()
         self.inventory_check_tool = InventoryCheckTool()
-        self.search_company_tool = SearchCompanyTool()
+        self.search_company_tool = SearchCompanyTool() #enabled
         self.ticker_lookup_tool = TickerLookupTool()
         self.calculator_tool = CalculatorTool()
