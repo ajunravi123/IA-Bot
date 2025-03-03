@@ -107,16 +107,46 @@ async def detect_question(text: str) -> dict:
             return {"is_question": is_question, "company": company_name}
         return {"is_question": any(phrase in text.lower() for phrase in ["tell me", "please explain"]) or text.strip().endswith("?"), "company": None}
 
-    
 
-async def generate_retrieval_response(query: str, is_question: bool) -> str:
-    """Generate a natural language response using retrieved context."""
+def generate_retrieval_response(query: str, is_question: bool) -> str:
+    """Generate a natural language response using retrieved context or LLM fallback."""
     contexts = retrieval_agent.retrieve_context(query, top_k=3)
     
-    if not contexts:
-        return "I couldn't find relevant information to answer your query."
+    def generate_llm_fallback(query: str):
+        """Generate a humorous, human-like fallback response using the LLM."""
+        description = f"""
+        The user asked: '{query}'. I don’t have relevant info to answer this.
+        Create a short, humorous, and conversational response that:
+        - Admits I don’t know the answer in a fun way.
+        - Redirects the user to ask about 'Impact Analytics' with enthusiasm.
+        - Avoids mentioning the context or document explicitly.
+        - Keeps it light and human-like.
+
+        Example outputs:
+        - "Oh no, I’m totally lost on that! How about Impact Analytics? I’m dying to spill the beans on that!"
+        - "Yikes, that’s a stumper! Want to chat about Impact Analytics instead? I’ve got tons to share!"
+        """
+        task = Task(
+            description=description,
+            expected_output="A short, humorous natural language response",
+            agent=llm_agent
+        )
+        crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)
+        result = crew.kickoff()  # Synchronous call
+        return result.tasks_output[0].raw.strip()
+
+    if not contexts or all(not ctx["content"].strip() for ctx in contexts):
+        return generate_llm_fallback(query)
     
     retrieved_content = "\n".join([ctx["content"] for ctx in contexts])
+    
+    # Basic relevance check: any overlap between query and context words
+    query_words = set(query.lower().split())
+    context_words = set(retrieved_content.lower().split())
+    has_overlap = bool(query_words & context_words)
+    
+    if not has_overlap:
+        return generate_llm_fallback(query)
     
     if is_question:
         description = f"""
@@ -141,7 +171,7 @@ async def generate_retrieval_response(query: str, is_question: bool) -> str:
         agent=llm_agent
     )
     crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)
-    result = crew.kickoff()
+    result = crew.kickoff()  # Synchronous call
     return result.tasks_output[0].raw.strip()
 
 @app.websocket("/ws")
@@ -166,7 +196,7 @@ async def websocket_endpoint(websocket: WebSocket):
             retries = 0
             while retries < MAX_RETRIES:
                 try:
-                    # Use LLM to detect if it's a question
+                    # Use LLM to detect if it's a question                  
                     analysis_result = await detect_question(user_input)
                     is_question = analysis_result["is_question"]
                     company = analysis_result["company"]
@@ -176,7 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     if is_question:
                         # Handle as a retrieval-based query (questions or non-financial statements)
                         await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
-                        response = await generate_retrieval_response(user_input, is_question)
+                        response = generate_retrieval_response(user_input, is_question)
                         
                         await websocket.send_json({
                             "type": "question_result",  # Changed from "result" to "question_result"
