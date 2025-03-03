@@ -108,12 +108,12 @@ async def detect_question(text: str) -> dict:
         return {"is_question": any(phrase in text.lower() for phrase in ["tell me", "please explain"]) or text.strip().endswith("?"), "company": None}
 
 
-def generate_retrieval_response(query: str, is_question: bool) -> str:
-    """Generate a natural language response using retrieved context or LLM fallback."""
+
+def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, list[str]]:
+    """Generate a natural language response with an array of matched URLs using retrieved context."""
     contexts = retrieval_agent.retrieve_context(query, top_k=3)
     
     def generate_llm_fallback(query: str):
-        """Generate a humorous, human-like fallback response using the LLM."""
         description = f"""
         The user asked: '{query}'. I don’t have relevant info to answer this.
         Create a short, humorous, and conversational response that:
@@ -121,10 +121,6 @@ def generate_retrieval_response(query: str, is_question: bool) -> str:
         - Redirects the user to ask about 'Impact Analytics' with enthusiasm.
         - Avoids mentioning the context or document explicitly.
         - Keeps it light and human-like.
-
-        Example outputs:
-        - "Oh no, I’m totally lost on that! How about Impact Analytics? I’m dying to spill the beans on that!"
-        - "Yikes, that’s a stumper! Want to chat about Impact Analytics instead? I’ve got tons to share!"
         """
         task = Task(
             description=description,
@@ -132,22 +128,17 @@ def generate_retrieval_response(query: str, is_question: bool) -> str:
             agent=llm_agent
         )
         crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)
-        result = crew.kickoff()  # Synchronous call
+        result = crew.kickoff()
         return result.tasks_output[0].raw.strip()
 
+    # If no contexts or all contexts are empty, return fallback with empty sources
     if not contexts or all(not ctx["content"].strip() for ctx in contexts):
-        return generate_llm_fallback(query)
+        return (generate_llm_fallback(query), [])  # No URLs for fallback
     
     retrieved_content = "\n".join([ctx["content"] for ctx in contexts])
-    
-    # Basic relevance check: any overlap between query and context words
-    query_words = set(query.lower().split())
-    context_words = set(retrieved_content.lower().split())
-    has_overlap = bool(query_words & context_words)
-    
-    if not has_overlap:
-        return generate_llm_fallback(query)
-    
+    source_urls = list(set(ctx["metadata"]["url"] for ctx in contexts if "metadata" in ctx and "url" in ctx["metadata"]))
+
+    # Step 1: Let LLM generate a response based on context
     if is_question:
         description = f"""
         Based on the following context, provide a concise answer to the user's question:
@@ -155,6 +146,7 @@ def generate_retrieval_response(query: str, is_question: bool) -> str:
         Context: {retrieved_content}
         
         Answer in a natural, conversational tone. Keep it brief and to the point.
+        If the context doesn’t provide enough information to answer the question meaningfully, respond with 'INSUFFICIENT_CONTEXT'.
         """
     else:
         description = f"""
@@ -163,16 +155,27 @@ def generate_retrieval_response(query: str, is_question: bool) -> str:
         Context: {retrieved_content}
         
         Respond in a natural, conversational tone. Keep it brief and relevant.
+        If the context doesn’t provide enough information to respond meaningfully, respond with 'INSUFFICIENT_CONTEXT'.
         """
-    
+
     task = Task(
         description=description,
-        expected_output="A concise natural language response",
+        expected_output="A concise natural language response or 'INSUFFICIENT_CONTEXT'",
         agent=llm_agent
     )
+    
     crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)
-    result = crew.kickoff()  # Synchronous call
-    return result.tasks_output[0].raw.strip()
+    result = crew.kickoff()
+    response = result.tasks_output[0].raw.strip()
+
+    # Step 2: Check if LLM found the context insufficient
+    if response == 'INSUFFICIENT_CONTEXT':
+        return (generate_llm_fallback(query), [])  # No URLs if context is insufficient
+
+    # Return response with source URLs if LLM provided a meaningful answer
+    return (response, source_urls)
+
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -211,7 +214,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_json({
                             "type": "question_result",  # Changed from "result" to "question_result"
                             "data": {
-                                "matched_paragraphs": response
+                                "matched_paragraphs": response[0],
+                                "urls": response[1]
                             },
                             "request_id": request_id
                         })

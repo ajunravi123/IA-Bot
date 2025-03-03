@@ -14,7 +14,7 @@ let predefinedQuestions = [];
 
 // Track if first user input has been sent and if predefined questions are added
 let firstInputSent = false;
-let predefinedQuestionsAdded = false; // Flag to track if questions are already added
+let predefinedQuestionsAdded = false;
 // Store pending requests with unique IDs
 const pendingRequests = new Map();
 
@@ -30,7 +30,6 @@ socketMain.onmessage = function(event) {
     
     switch(data.type) {
         case "thinking":
-            // Check if this question is already in the DOM to prevent duplicates
             if (!$(`#container-${data.request_id}`).length) {
                 const userMessage = pendingRequests.get(data.request_id);
                 if (!userMessage) {
@@ -52,11 +51,9 @@ socketMain.onmessage = function(event) {
                     </div>
                 `);
             }
-            // Show predefined questions block only after first user input and if not already added
             if (!firstInputSent) {
                 firstInputSent = true;
                 if (!predefinedQuestionsAdded) {
-                    // Request predefined questions from predefined.py
                     socketPredefined.send(JSON.stringify({ type: "fetch_predefined_questions", request_id: data.request_id }));
                 }
             }
@@ -70,7 +67,7 @@ socketMain.onmessage = function(event) {
             break;
         case "question":
             $(`#loader-${data.request_id}`).remove();
-            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
+            $(`#agent-info-${data.request_id}`).remove();
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -79,13 +76,35 @@ socketMain.onmessage = function(event) {
                 </div>
             `);
             break;
-        case "question_result":  // New case for question responses
+        case "question_result":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove();
+            let sourcesSection = '';
+            if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
+                sourcesSection = `
+                    <div class="sources-content mt-3">
+                        <button class="btn btn-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${data.request_id}" aria-expanded="false" aria-controls="sources-${data.request_id}">
+                            <i class="fas fa-link me-2"></i> View Sources (${data.data.urls.length})
+                        </button>
+                        <div class="collapse" id="sources-${data.request_id}">
+                            <ul class="list-group sources-list">
+                                ${data.data.urls.map(url => `
+                                    <li class="list-group-item source-item">
+                                        <a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${url}</a>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
-                    ${data.data.matched_paragraphs}
+                    <div class="message-content">
+                        ${data.data.matched_paragraphs}
+                        ${sourcesSection}
+                    </div>
                     <span class="timestamp">${formatTimestamp()}</span>
                 </div>
             `);
@@ -94,7 +113,7 @@ socketMain.onmessage = function(event) {
             break;
         case "message":
             $(`#loader-${data.request_id}`).remove();
-            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
+            $(`#agent-info-${data.request_id}`).remove();
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -106,13 +125,13 @@ socketMain.onmessage = function(event) {
             break;
         case "result":
             $(`#loader-${data.request_id}`).remove();
-            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
+            $(`#agent-info-${data.request_id}`).remove();
             renderResults(data, data.request_id);
             pendingRequests.delete(data.request_id);
             break;
         case "error":
             $(`#loader-${data.request_id}`).remove();
-            $(`#agent-info-${data.request_id}`).remove(); // Remove agent info when loader is removed
+            $(`#agent-info-${data.request_id}`).remove();
             $(`#container-${data.request_id}`).append(`
                 <div class="message bot-message text-danger fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -132,7 +151,6 @@ socketPredefined.onmessage = function(event) {
     
     switch(data.type) {
         case "thinking":
-            // Check if this question is already in the DOM to prevent duplicates
             if (!$(`#container-${data.request_id}`).length) {
                 const userMessage = pendingRequests.get(data.request_id) || "Unknown question";
                 chatMessages.append(`
@@ -174,9 +192,8 @@ socketPredefined.onmessage = function(event) {
             pendingRequests.delete(data.request_id);
             break;
         case "predefined_questions":
-            // Handle the list of predefined questions from predefined.py
             if (!predefinedQuestionsAdded) {
-                predefinedQuestions = data.questions; // Store the fetched questions
+                predefinedQuestions = data.questions;
                 chatMessages.append(`
                     <div class="message-container predefined-block animated-message">
                         <div class="message bot-message fade-in">
@@ -190,7 +207,7 @@ socketPredefined.onmessage = function(event) {
                         </div>
                     </div>
                 `);
-                predefinedQuestionsAdded = true; // Mark as added to prevent duplicates
+                predefinedQuestionsAdded = true;
                 chatMessages.scrollTop(chatMessages[0].scrollHeight);
             }
             break;
@@ -202,7 +219,6 @@ function sendMessage() {
     const message = input.val().trim();
     if (message) {
         const requestId = Date.now().toString();
-        // Check if this question is already in the DOM to prevent duplicates
         if (!$(`#container-${requestId}`).length) {
             chatMessages.append(`
                 <div class="message-container" id="container-${requestId}">
@@ -229,7 +245,6 @@ function sendMessage() {
 
 function sendPredefinedQuestion(question, parentRequestId) {
     const requestId = Date.now().toString();
-    // Escape single quotes and check for duplicates
     const escapedQuestion = escapeSingleQuotes(question);
     if (!$(`#container-${requestId}`).length) {
         chatMessages.append(`
@@ -252,13 +267,12 @@ function sendPredefinedQuestion(question, parentRequestId) {
     chatMessages.scrollTop(chatMessages[0].scrollHeight);
 }
 
-// Function to escape single quotes and other special characters for JSON safety
 function escapeSingleQuotes(str) {
     return str
-        .replace(/'/g, "\\'")  // Escape single quotes
-        .replace(/"/g, '\\"')  // Escape double quotes
-        .replace(/\n/g, '\\n') // Escape newlines
-        .replace(/\r/g, '\\r'); // Escape carriage returns
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
 }
 
 function parseBenefitValue(value) {
@@ -276,12 +290,10 @@ function createBarChart(canvasId, labels, lowValues, highValues, currency) {
     const canvas = document.getElementById(canvasId);
     const ctx = canvas.getContext('2d');
 
-    // Destroy any existing chart instance for this canvas
     if (chartInstances.has(canvasId)) {
         chartInstances.get(canvasId).destroy();
     }
 
-    // Create new chart and store it
     const newChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -333,8 +345,8 @@ function renderResults(data, requestId) {
     let benefitsTable = '';
     let barChart = '';
     let summary = '';
+    let sourcesSection = '';
 
-    // Financial Data Table
     if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
         const currency = data.data.financial_data.currency || '';
         financialTable = `
@@ -367,7 +379,6 @@ function renderResults(data, requestId) {
         `;
     }
 
-    // Benefits Table and Bar Chart
     if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
         const currency = data.data.financial_data.currency || '';
         benefitsTable = `
@@ -397,7 +408,6 @@ function renderResults(data, requestId) {
         const labels = Object.keys(data.data.benefits);
         const lowValues = labels.map(key => parseBenefitValue(data.data.benefits[key].low));
         const highValues = labels.map(key => parseBenefitValue(data.data.benefits[key].high));
-
         const canvasId = `benefitsChart_${Date.now()}`;
         barChart = `
             <div class="chart-content">
@@ -405,36 +415,49 @@ function renderResults(data, requestId) {
                 <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
             </div>
         `;
-
-        summary = data.data.summary || 'Financial benefits calculated.';
-        $(`#container-${requestId}`).append(`
-            <div class="message bot-message fade-in">
-                <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
-                <div class="message-content">
-                    ${financialTable}
-                    ${benefitsTable}
-                    ${barChart}
-                    <div class="summary mt-3">${summary}</div>
-                </div>
-                <span class="timestamp">${formatTimestamp()}</span>
-            </div>
-        `);
-
-        // Initialize the chart after appending
-        createBarChart(canvasId, labels, lowValues, highValues, currency);
-    } else {
-        summary = data.data.summary || 'No benefits calculated due to insufficient data.';
-        $(`#container-${requestId}`).append(`
-            <div class="message bot-message fade-in">
-                <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
-                <div class="message-content">
-                    ${financialTable}
-                    <div class="summary mt-3">${summary}</div>
-                </div>
-                <span class="timestamp">${formatTimestamp()}</span>
-            </div>
-        `);
     }
+
+    if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
+        sourcesSection = `
+            <div class="sources-content mt-3">
+                <button class="btn btn-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${requestId}" aria-expanded="false" aria-controls="sources-${requestId}">
+                    <i class="fas fa-link me-2"></i> View Sources (${data.data.urls.length})
+                </button>
+                <div class="collapse" id="sources-${requestId}">
+                    <ul class="list-group sources-list">
+                        ${data.data.urls.map(url => `
+                            <li class="list-group-item source-item">
+                                <a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${url}</a>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+
+    summary = data.data.summary || (data.data.benefits ? 'Financial benefits calculated.' : 'No benefits calculated due to insufficient data.');
+
+    $(`#container-${requestId}`).append(`
+        <div class="message bot-message fade-in">
+            <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+            <div class="message-content">
+                ${financialTable}
+                ${benefitsTable}
+                ${barChart}
+                <div class="summary mt-3">${summary}</div>
+                ${sourcesSection}
+            </div>
+            <span class="timestamp">${formatTimestamp()}</span>
+        </div>
+    `);
+
+    if (barChart) {
+        const canvasId = `benefitsChart_${Date.now()}`;
+        createBarChart(canvasId, labels, lowValues, highValues, data.data.financial_data.currency || '');
+    }
+
+    chatMessages.scrollTop(chatMessages[0].scrollHeight);
 }
 
 $("#user-input").keypress(function(e) {
