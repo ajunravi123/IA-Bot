@@ -1,4 +1,3 @@
-# retrieval_agent.py
 import faiss
 import numpy as np
 from pathlib import Path
@@ -6,12 +5,13 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from crewai import Agent
 from config import llm_client
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
 class RetrievalAgent:
-    def __init__(self, index_path="./vindex/combined_index.index", chunks_path="./vindex/combined_clean.txt"):
-        """Initialize the retrieval agent with FAISS index and document chunks."""
+    def __init__(self, index_path="./vindex/combined_index.index", chunks_path="./vindex/combined_chunks_with_metadata.jsonl"):
+        """Initialize the retrieval agent with FAISS index and document chunks with metadata."""
         self.embedding_model = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en")
         self.index_path = Path(index_path)
         self.chunks_path = Path(chunks_path)
@@ -28,10 +28,16 @@ class RetrievalAgent:
         if not self.chunks_path.exists():
             raise FileNotFoundError(f"Chunks file not found: {self.chunks_path.resolve()}")
 
-        # Load document chunks
+        # Load document chunks with metadata
+        self.all_docs = []
         with self.chunks_path.open("r", encoding="utf-8") as f:
-            self.all_docs = [line.strip() for line in f.readlines() if line.strip()]
-        print(f"Loaded {len(self.all_docs)} chunks from {self.chunks_path.resolve()}")
+            for line in f:
+                chunk_data = json.loads(line.strip())
+                self.all_docs.append({
+                    "content": chunk_data["content"],
+                    "metadata": chunk_data["metadata"]
+                })
+        print(f"Loaded {len(self.all_docs)} chunks with metadata from {self.chunks_path.resolve()}")
 
         # Validate consistency
         if self.index.ntotal != len(self.all_docs):
@@ -47,7 +53,7 @@ class RetrievalAgent:
         )
 
     def retrieve_context(self, query, top_k=3):
-        """Retrieve top-k relevant chunks for a given query."""
+        """Retrieve top-k relevant chunks with content and metadata for a given query."""
         query_embedding = self.embedding_model.embed_query(query)
         query_embedding = np.array([query_embedding], dtype=np.float32)
 
@@ -63,9 +69,10 @@ class RetrievalAgent:
                     "rank": i + 1,
                     "distance": float(dist),
                     "index": int(idx),
-                    "content": chunk
+                    "content": chunk["content"],
+                    "metadata": chunk["metadata"]  # Include metadata with URL
                 })
-                print(f"Rank {i+1}: Distance={dist:.4f}, Index={idx}, Chunk='{chunk[:100]}...'")
+                print(f"Rank {i+1}: Distance={dist:.4f}, Index={idx}, URL={chunk['metadata']['url']}, Chunk='{chunk['content'][:100]}...'")
             else:
                 print(f"Warning: Invalid index {idx} retrieved (out of bounds)")
         

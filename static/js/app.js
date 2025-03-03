@@ -83,14 +83,15 @@ socketMain.onmessage = function(event) {
             if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
                 sourcesSection = `
                     <div class="sources-content mt-3">
-                        <button class="btn btn-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${data.request_id}" aria-expanded="false" aria-controls="sources-${data.request_id}">
-                            <i class="fas fa-link me-2"></i> View Sources (${data.data.urls.length})
+                        <button class="btn btn-futuristic-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${data.request_id}" aria-expanded="false" aria-controls="sources-${data.request_id}">
+                            <span class="source-text">Sources (${data.data.urls.length})</span>
+                            <i class="fas fa-chevron-down source-icon"></i>
                         </button>
                         <div class="collapse" id="sources-${data.request_id}">
-                            <ul class="list-group sources-list">
+                            <ul class="list-group futuristic-sources-list">
                                 ${data.data.urls.map(url => `
-                                    <li class="list-group-item source-item">
-                                        <a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${url}</a>
+                                    <li class="list-group-item futuristic-source-item">
+                                        <a href="${url}" target="_blank" rel="noopener noreferrer" class="futuristic-source-link">${url}</a>
                                     </li>
                                 `).join('')}
                             </ul>
@@ -420,14 +421,15 @@ function renderResults(data, requestId) {
     if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
         sourcesSection = `
             <div class="sources-content mt-3">
-                <button class="btn btn-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${requestId}" aria-expanded="false" aria-controls="sources-${requestId}">
-                    <i class="fas fa-link me-2"></i> View Sources (${data.data.urls.length})
+                <button class="btn btn-futuristic-sources" type="button" data-bs-toggle="collapse" data-bs-target="#sources-${requestId}" aria-expanded="false" aria-controls="sources-${requestId}">
+                    <span class="source-text">Sources (${data.data.urls.length})</span>
+                    <i class="fas fa-chevron-down source-icon"></i>
                 </button>
                 <div class="collapse" id="sources-${requestId}">
-                    <ul class="list-group sources-list">
+                    <ul class="list-group futuristic-sources-list">
                         ${data.data.urls.map(url => `
-                            <li class="list-group-item source-item">
-                                <a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${url}</a>
+                            <li class="list-group-item futuristic-source-item">
+                                <a href="${url}" target="_blank" rel="noopener noreferrer" class="futuristic-source-link">${url}</a>
                             </li>
                         `).join('')}
                     </ul>
