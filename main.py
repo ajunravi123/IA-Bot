@@ -56,20 +56,14 @@ async def send_agent_update(websocket: WebSocket, agent_name: str, tool_name: st
     })
 
 async def detect_question(text: str) -> dict:
-    """Use an Agent to determine if the input is a question and extract a company name if present."""
     task = Task(
         description=f"""
         Analyze the following text and determine:
-        1. If it's a question (True/False). A question is any sentence that seeks information, clarification, or an answer. Look for:
-           - Sentences starting with common question words (e.g., what, how, why, when, where, who, is, are, does, can, could, would, should, etc.).
-           - Phrases implying a request for information (e.g., "tell me about", "please explain").
-           - Natural language cues that indicate the user is asking something.
-        2. If it contains a company name, extract it; otherwise, return null. A company name is any proper noun or entity name mentioned in patterns like:
-           - "my company name is <NAME>"
-           - "I want to check for <NAME>"
-           - "Go for <NAME>"
-           - "<NAME> is my company"
-           - Or similar phrases explicitly indicating a company.
+        1. Whether it is a question (True/False). A question is any sentence or phrase that seeks information, clarification, or an answer. Do not rely solely on specific keywords (e.g., 'what', 'how', 'why', 'when', 'where', 'who', 'is', 'are', 'does', 'can') or punctuation (e.g., '?'). Instead, use your understanding of natural language to interpret the intent. Consider:
+           - Does the text imply the user is asking for something to be explained, provided, or clarified?
+           - Does the phrasing suggest curiosity, a request, or uncertainty?
+           - Context and tone that differentiate it from a statement or command.
+        2. If it contains a company name, extract it; otherwise, return null. A company name is any proper noun or entity name explicitly mentioned as a company.
 
         Return your response as a JSON string with the following format:
         {{
@@ -78,16 +72,10 @@ async def detect_question(text: str) -> dict:
         }}
 
         Examples:
+        - "Tell me about gravity" -> {{"is_question": true, "company": null}}
         - "What is gravity" -> {{"is_question": true, "company": null}}
-        - "Can you please tell me about India" -> {{"is_question": true, "company": null}}
-        - "When will be the next solar eclipse?" -> {{"is_question": true, "company": null}}
-        - "Why you are shy" -> {{"is_question": true, "company": null}}
-        - "My company name is Tesla, please analyse it." -> {{"is_question": true, "company": "Tesla"}}
-        - "My company name is looperman" -> {{"is_question": false, "company": "looperman"}}
-        - "I want to check for Google." -> {{"is_question": true, "company": "Google"}}
-        - "Go for Apple" -> {{"is_question": false, "company": "Apple"}}
-        - "Microsoft is my company." -> {{"is_question": false, "company": "Microsoft"}}
-        - "This is a statement." -> {{"is_question": false, "company": null}}
+        - "Gravity is interesting" -> {{"is_question": false, "company": null}}
+        - "You know about Tesla" -> {{"is_question": true, "company": "Tesla"}}
 
         Text: {text}
         """,
@@ -97,24 +85,28 @@ async def detect_question(text: str) -> dict:
     crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)
     result = crew.kickoff()
     
-    # Log the raw output for debugging
     raw_output = result.tasks_output[0].raw.strip()
     print(f"Raw LLM output for '{text}': {raw_output}")
     
-    # Parse the JSON response from the LLM
+    # Clean the raw output by removing code block markers and extra whitespace
+    cleaned_output = raw_output.replace('```json', '').replace('```', '').strip()
+    
+    # Parse the cleaned JSON response
     try:
-        output = json.loads(raw_output)
+        output = json.loads(cleaned_output)
         return {
             "is_question": output["is_question"],
             "company": output["company"]
         }
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Error parsing LLM output: {e}. Raw output: {raw_output}")
-        # Minimal fallback: only for company name if pattern is clear
+        # Fallback: Minimal logic if LLM fails
         if "my company name is" in text.lower():
             company_name = text.lower().split("my company name is")[-1].strip().split(",")[0].strip()
-            return {"is_question": text.endswith("?"), "company": company_name}
-        return {"is_question": text.endswith("?"), "company": None}
+            is_question = any(phrase in text.lower() for phrase in ["tell me", "please", "explain", "analyse"]) or text.strip().endswith("?")
+            return {"is_question": is_question, "company": company_name}
+        return {"is_question": any(phrase in text.lower() for phrase in ["tell me", "please explain"]) or text.strip().endswith("?"), "company": None}
+
     
 
 async def generate_retrieval_response(query: str, is_question: bool) -> str:
