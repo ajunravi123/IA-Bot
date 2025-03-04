@@ -59,11 +59,18 @@ async def detect_question(text: str) -> dict:
     task = Task(
         description=f"""
         Analyze the following text and determine:
-        1. Whether it is a question (True/False). A question is any sentence or phrase that seeks information, clarification, or an answer. Do not rely solely on specific keywords (e.g., 'what', 'how', 'why', 'when', 'where', 'who', 'is', 'are', 'does', 'can') or punctuation (e.g., '?'). Instead, use your understanding of natural language to interpret the intent. Consider:
+        1. Whether it is a question (True/False). A question is any sentence or phrase that seeks information, clarification, or an answer. Use your understanding of natural language to interpret the intent, considering:
            - Does the text imply the user is asking for something to be explained, provided, or clarified?
            - Does the phrasing suggest curiosity, a request, or uncertainty?
            - Context and tone that differentiate it from a statement or command.
-        2. If it contains a company name, extract it; otherwise, return null. A company name is any proper noun or entity name explicitly mentioned as a company.
+           - Do NOT rely on specific keywords or punctuation alone; focus on the overall intent.
+
+        Special Rule for ROI/Financial Queries:
+        - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, or similar financial metrics for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", or "find the balancesheet of [company]".
+        - If the text asks about ROI, financial information, or balancesheet data but does NOT specify a company (e.g., "What is ROI?", "Explain financials"), set 'is_question' to True and return 'company' as null.
+        - Use your judgment to identify financial-related terms and company names based on context, without relying on hardcoded lists. Company names can be any proper noun or entity the user associates with financial data in the text.
+
+        2. If the text contains a company name (a proper noun or entity explicitly mentioned as a company), extract it; otherwise, return null.
 
         Return your response as a JSON string with the following format:
         {{
@@ -76,6 +83,13 @@ async def detect_question(text: str) -> dict:
         - "What is gravity" -> {{"is_question": true, "company": null}}
         - "Gravity is interesting" -> {{"is_question": false, "company": null}}
         - "You know about Tesla" -> {{"is_question": true, "company": "Tesla"}}
+        - "Calculate the ROI of RL" -> {{"is_question": false, "company": "RL"}}
+        - "Can you find the ROI of Tesla?" -> {{"is_question": false, "company": "Tesla"}}
+        - "What is the ROI of XYZ?" -> {{"is_question": false, "company": "XYZ"}}
+        - "Show balancesheet of Puma" -> {{"is_question": false, "company": "Puma"}}
+        - "What is ROI?" -> {{"is_question": true, "company": null}}
+        - "Explain financials" -> {{"is_question": true, "company": null}}
+        - "Get data for SpaceX" -> {{"is_question": false, "company": "SpaceX"}}
 
         Text: {text}
         """,
@@ -100,13 +114,17 @@ async def detect_question(text: str) -> dict:
         }
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Error parsing LLM output: {e}. Raw output: {raw_output}")
-        # Fallback: Minimal logic if LLM fails
-        if "my company name is" in text.lower():
-            company_name = text.lower().split("my company name is")[-1].strip().split(",")[0].strip()
-            is_question = any(phrase in text.lower() for phrase in ["tell me", "please", "explain", "analyse"]) or text.strip().endswith("?")
-            return {"is_question": is_question, "company": company_name}
-        return {"is_question": any(phrase in text.lower() for phrase in ["tell me", "please explain"]) or text.strip().endswith("?"), "company": None}
-
+        # Fallback: Minimal intent-based logic without hardcoded phrases
+        # Assume a question if the text ends with '?' or has a clear interrogative tone
+        # Assume a company if a proper noun follows a verb suggesting action
+        words = text.split()
+        is_question = text.strip().endswith("?") or len(words) > 1 and words[0].lower() in ["what", "how", "why", "when", "where", "who"]
+        company = None
+        for i, word in enumerate(words):
+            if i > 0 and word[0].isupper() and words[i-1].lower() in ["of", "for", "about"]:
+                company = word
+                break
+        return {"is_question": is_question, "company": company}
 
 
 def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, list[str]]:
@@ -205,7 +223,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     company = analysis_result["company"]
                     if not is_question and company is not None and company != "":
                         user_input = company
-                    
+
                     if is_question:
                         # Handle as a retrieval-based query (questions or non-financial statements)
                         await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
