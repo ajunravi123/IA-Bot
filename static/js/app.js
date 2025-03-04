@@ -289,6 +289,10 @@ const chartInstances = new Map();
 
 function createBarChart(canvasId, labels, lowValues, highValues, currency) {
     const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.error(`Canvas element with ID ${canvasId} not found`);
+        return;
+    }
     const ctx = canvas.getContext('2d');
 
     if (chartInstances.has(canvasId)) {
@@ -347,6 +351,7 @@ function renderResults(data, requestId) {
     let barChart = '';
     let summary = '';
     let sourcesSection = '';
+    let chartData = null;
 
     if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
         const currency = data.data.financial_data.currency || '';
@@ -381,7 +386,7 @@ function renderResults(data, requestId) {
     }
 
     if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
-        const currency = data.data.financial_data.currency || '';
+        const currency = data.data.financial_data ? data.data.financial_data.currency || '' : '';
         benefitsTable = `
             <div class="benefits-content">
                 <h4>Calculated Benefits</h4>
@@ -409,13 +414,14 @@ function renderResults(data, requestId) {
         const labels = Object.keys(data.data.benefits);
         const lowValues = labels.map(key => parseBenefitValue(data.data.benefits[key].low));
         const highValues = labels.map(key => parseBenefitValue(data.data.benefits[key].high));
-        const canvasId = `benefitsChart_${Date.now()}`;
+        const canvasId = `benefitsChart_${requestId}`; // Use requestId for uniqueness
         barChart = `
             <div class="chart-content">
                 <h4>Benefits Bar Graph</h4>
                 <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
             </div>
         `;
+        chartData = { canvasId, labels, lowValues, highValues, currency };
     }
 
     if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
@@ -454,9 +460,11 @@ function renderResults(data, requestId) {
         </div>
     `);
 
-    if (barChart) {
-        const canvasId = `benefitsChart_${Date.now()}`;
-        createBarChart(canvasId, labels, lowValues, highValues, data.data.financial_data.currency || '');
+    // Only create the chart if chartData exists
+    if (chartData) {
+        createBarChart(chartData.canvasId, chartData.labels, chartData.lowValues, chartData.highValues, chartData.currency);
+    } else {
+        console.log("No benefits data available to generate chart.");
     }
 
     chatMessages.scrollTop(chatMessages[0].scrollHeight);
