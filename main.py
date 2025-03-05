@@ -129,7 +129,7 @@ async def detect_question(text: str) -> dict:
 
 def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, list[str]]:
     """Generate a natural language response with an array of matched URLs using retrieved context."""
-    contexts = retrieval_agent.retrieve_context(query, top_k=6)
+    contexts = retrieval_agent.retrieve_context(query, top_k=4)
     
     def generate_llm_fallback(query: str):
         description = f"""
