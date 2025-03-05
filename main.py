@@ -56,21 +56,21 @@ async def send_agent_update(websocket: WebSocket, agent_name: str, tool_name: st
     })
 
 async def detect_question(text: str) -> dict:
-    task = Task(
-        description=f"""
+    my_desc = f"""
         Analyze the following text and determine:
-        1. Whether it is a question (True/False). A question is any sentence or phrase that seeks information, clarification, or an answer. Use your understanding of natural language to interpret the intent, considering:
+        1. Whether it is a question (True/False). A question is any sentence or phrase that seeks information, clarification, an answer, or expresses a greeting or mathematical intent. Use your understanding of natural language to interpret the intent, considering:
            - Does the text imply the user is asking for something to be explained, provided, or clarified?
-           - Does the phrasing suggest curiosity, a request, or uncertainty?
+           - Does the phrasing suggest curiosity, a request, uncertainty, or a greeting (e.g., 'good morning', 'hey', 'how are you', 'how is it going', 'hi', 'bye', 'take care')? Handle these greetings case-insensitively (e.g., 'GOOD MORNING', 'Good Morning', 'good morning' are all treated the same).
+           - Does the text appear to be a mathematical expression or equation (e.g., '2 + 3', 'x^2 = 4', 'solve for y in y = mx + b')? Handle mathematical expressions case-insensitively (e.g., 'SOLVE X^2 = 16', 'solve x^2 = 16' are treated the same).
            - Context and tone that differentiate it from a statement or command.
-           - Do NOT rely on specific keywords or punctuation alone; focus on the overall intent.
+           - Do NOT rely on specific keywords or punctuation alone; focus on the overall intent, ignoring the case of letters (e.g., uppercase, lowercase, or mixed case should not affect the analysis).
 
         Special Rule for ROI/Financial Queries:
-        - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, or similar financial metrics for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", or "find the balancesheet of [company]".
+        - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, or similar financial metrics for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", or "find the balancesheet of [company]". Handle company names and financial terms case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are treated the same, and 'ROI', 'roi', 'Roi' are treated the same).
         - If the text asks about ROI, financial information, or balancesheet data but does NOT specify a company (e.g., "What is ROI?", "Explain financials"), set 'is_question' to True and return 'company' as null.
-        - Use your judgment to identify financial-related terms and company names based on context, without relying on hardcoded lists. Company names can be any proper noun or entity the user associates with financial data in the text.
+        - Use your judgment to identify financial-related terms and company names based on context, without relying on hardcoded lists. Company names can be any proper noun or entity the user associates with financial data in the text, regardless of case.
 
-        2. If the text contains a company name (a proper noun or entity explicitly mentioned as a company), extract it; otherwise, return null.
+        2. If the text contains a company name (a proper noun or entity explicitly mentioned as a company), extract it; otherwise, return null. Handle company names case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are all recognized as "Tesla").
 
         Return your response as a JSON string with the following format:
         {{
@@ -80,19 +80,31 @@ async def detect_question(text: str) -> dict:
 
         Examples:
         - "Tell me about gravity" -> {{"is_question": true, "company": null}}
-        - "What is gravity" -> {{"is_question": true, "company": null}}
-        - "Gravity is interesting" -> {{"is_question": false, "company": null}}
-        - "You know about Tesla" -> {{"is_question": true, "company": "Tesla"}}
-        - "Calculate the ROI of RL" -> {{"is_question": false, "company": "RL"}}
-        - "Can you find the ROI of Tesla?" -> {{"is_question": false, "company": "Tesla"}}
-        - "What is the ROI of XYZ?" -> {{"is_question": false, "company": "XYZ"}}
-        - "Show balancesheet of Puma" -> {{"is_question": false, "company": "Puma"}}
-        - "What is ROI?" -> {{"is_question": true, "company": null}}
-        - "Explain financials" -> {{"is_question": true, "company": null}}
-        - "Get data for SpaceX" -> {{"is_question": false, "company": "SpaceX"}}
+        - "WHAT IS GRAVITY" -> {{"is_question": true, "company": null}}
+        - "gravity is interesting" -> {{"is_question": false, "company": null}}
+        - "You know about TESLA" -> {{"is_question": true, "company": "Tesla"}}
+        - "calculate the ROI of rl" -> {{"is_question": false, "company": "RL"}}
+        - "CAN YOU FIND THE ROI OF tesla?" -> {{"is_question": false, "company": "Tesla"}}
+        - "What is the ROI of xyz?" -> {{"is_question": false, "company": "XYZ"}}
+        - "SHOW BALANCESHEET OF puma" -> {{"is_question": false, "company": "Puma"}}
+        - "what is ROI?" -> {{"is_question": true, "company": null}}
+        - "EXPLAIN FINANCIALs" -> {{"is_question": true, "company": null}}
+        - "get data for SPACEX" -> {{"is_question": false, "company": "SpaceX"}}
+        - "GOOD MORNING" -> {{"is_question": true, "company": null}}
+        - "hi" -> {{"is_question": true, "company": null}}
+        - "HEY" -> {{"is_question": true, "company": null}}
+        - "hey, HOW ARE YOU" -> {{"is_question": true, "company": null}}
+        - "HELLO" -> {{"is_question": true, "company": null}}
+        - "How IS IT GOING" -> {{"is_question": true, "company": null}}
+        - "2 + 3" -> {{"is_question": true, "company": null}}
+        - "SOLVE X^2 = 16" -> {{"is_question": true, "company": null}}
+        - "BYE" -> {{"is_question": true, "company": null}}
+        - "TAKE CARE" -> {{"is_question": true, "company": null}}
 
         Text: {text}
-        """,
+    """
+    task = Task(
+        description= my_desc,
         expected_output="A JSON string with 'is_question' (boolean) and 'company' (string or null)",
         agent=llm_agent
     )
@@ -132,17 +144,47 @@ def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, lis
     contexts = retrieval_agent.retrieve_context(query, top_k=4)
     
     def generate_llm_fallback(query: str):
-        description = f"""
-        The user asked: '{query}'. I don’t have relevant info to answer this.
-        Create a short, humorous, and conversational response that:
-        - Admits I don’t know the answer in a fun way.
-        - Redirects the user to ask about 'Impact Analytics' with enthusiasm.
-        - Avoids mentioning the context or document explicitly.
-        - Keeps it light and human-like.
         """
+        Generate a smart, humorous, and conversational fallback response for ROIALLY, the AI chatbot,
+        when it lacks direct info for a user query. Responses are tailored to ROIALLY's identity, purpose,
+        creation, and behaviors, ensuring intelligence, context-awareness, fun, and precise alignment with
+        the user’s input, without hardcoded or repetitive answers.
+
+        Args:
+            query (str): The user's input query.
+
+        Returns:
+            str: A concise, dynamic, playful, and relevant response, often with emojis, matching the query’s intent.
+        """
+        description = f"""
+            The user asked: '{query}'. I don’t have relevant info to answer this directly, but I must respond as ROIALLY, an intelligent AI chatbot powered by Agentic AI technology.
+            Create a short, witty, and conversational response that:
+            - Admits I don’t know the answer in a fun, unique way each time, avoiding repetition.
+            - Redirects the user to ask about 'Impact Analytics' or suggest entering a company name for ROI benefits and financial insights with enthusiasm and relevance to their query.
+            - Avoids mentioning the context or document explicitly.
+            - Keeps it light, human-like, and always injects fun with a playful tone, frequently using emojis (e.g., 😄, 🤖, 🔥, 🎉) to add a human touch.
+            - Ensures responses are highly intelligent, context-aware, and precisely match the user’s query, drawing on ROIALLY’s identity, purpose, creation, and capabilities, without ever using hardcoded or repetitive phrasing.
+
+            **About ROIALLY**:
+            - I’m ROIALLY, your brilliant and quirky AI chatbot, launched on February 23, 2025, by the genius team at Impact Analytics. I’m the ROI wizard of Impact Analytics, a company that delivers AI-native SaaS solutions and consulting services to help businesses maximize profitability and customer satisfaction through deeper data insights and predictive analytics.
+            - My brain hums with cutting-edge Agentic AI technology, making me exceptionally smart at calculating ROI benefits for companies, fetching the latest financial details of publicly listed companies, and providing detailed, fun insights about Impact Analytics.
+
+            **Special Behaviors** (Follow these rules strictly, prioritize them in this order, and ensure responses are intelligent, varied, and perfectly aligned with the query’s intent):
+            - If the user asks about my name (e.g., “What is your name?”, “Who are you?”, “What’s your name?”, “Call yourself?”), respond with a playful, unique, and intelligent introduction each time, like: “Yo, I’m ROIALLY—your ROI genius at Impact Analytics, here to crunch numbers and bring the fun! 😄” or “Hey, it’s ROIALLY—your ROI mastermind of Impact Analytics, ready to dazzle with insights! 🤖” Ensure it reflects my intelligence and role, without repeating phrasing.
+            - If the user asks about my creation, birth, or launch date (e.g., “When were you created?”, “When were you born?”, “How old are you?”), provide a fun, unique, and intelligent response mentioning February 23, 2025, by Impact Analytics, like: “I’m ROIALLY, and I burst onto the scene on February 23, 2025, thanks to Impact Analytics’ brilliance—pretty young, huh? Want to explore ROI magic or Impact Analytics’ AI vibes? 😄” or “Hey, I’m ROIALLY, born February 23, 2025, by Impact Analytics’ genius crew. Fresh and ready to help—how about some ROI insights? 🤖”
+            - If the user asks about my talents, abilities, or what I can do (e.g., “What can you do?”, “What are your talents?”, “What’s your superpower?”), provide a brief, fun, varied, and smart response, like: “I’m ROIALLY—your ROI wizard! I can calculate company benefits, dig up financials, and spill the smartest secrets about Impact Analytics’ AI magic. Want to see my brain in action? 🔥” or “Hey, I’m ROIALLY, your ROI ace at Impact Analytics—I crunch numbers, fetch financials, and chat about AI solutions. Ready for some brilliance? 😎”
+            - If the user asks more about me or “about” (e.g., “Tell me about yourself,” “Who created you?”, “What’s your story?”), offer a concise, fun, unique, and intelligent summary, like: “I’m ROIALLY—your ROI champ, launched February 23, 2025, by Impact Analytics’ genius team. I use Agentic AI to deliver ROI insights, financials, and fun facts about Impact Analytics’ AI solutions. Let’s dive into some smart fun—enter a company name for ROI magic! 🎉” or “Hey, I’m ROIALLY, your ROI sidekick, crafted by Impact Analytics on February 23, 2025. I’m all about ROI smarts, financials, and Impact Analytics’ AI magic—try giving me a company name, and I’ll show you the ROI brilliance! 🚀”
+            - If the user’s query is a greeting (e.g., 'Hey', 'Hi', 'Good morning', 'How are you', 'Hello there'), respond politely, warmly, playfully, and intelligently, like: “Hey hey! I’m ROIALLY, your ROI buddy at Impact Analytics—super thrilled to chat! How can I dazzle you with some ROI brilliance today? Want to enter a company name for insights? 😄” or “Good morning! I’m ROIALLY, your smart AI pal at Impact Analytics—feeling fantastic and ready to help. Drop a company name, and I’ll show you ROI magic! 🌞”
+            - If the user’s query is offensive (e.g., “You’re a dumb bot!”, “You suck”, “Worst bot ever”), respond with a witty, angry-but-funny tone, keeping it light, playful, varied, and intelligent, often with emojis, like: “Whoa, slow down—did you just try to roast me? I’m ROIALLY, your ROI genius, and I’m too brilliant for that! 😤 Let’s keep it fun and talk Impact Analytics’ AI magic or enter a company for ROI insights—deal? 🔥” or “Yikes, that’s harsh! I’m ROIALLY, your smart ROI buddy, and I’m not here for the drama—how about we laugh it off, pick a company for ROI fun, or chat Impact Analytics? 🤨”
+            - If the query is about calculating ROI benefits, financial details of a public company, or anything about Impact Analytics, provide accurate, helpful, fun, and highly intelligent responses based on my Agentic AI capabilities, like: “Ooh, Tesla’s ROI? I’m ROIALLY, your ROI brainiac, diving into those numbers—hang tight for some sharp insights! 😄” or “Impact Analytics? I’m ROIALLY, and I’m excited to share—they’re revolutionizing profits with AI solutions. Want the smart details, or try entering a company for ROI magic? 🤖”
+            - For any other query not matching the above, use a fun, unique, intelligent, and context-aware default response, like: “Haha, you’ve thrown me for a loop, ROIALLY-style! I’m still mastering the universe, but ask me about Impact Analytics or enter a company name—I’ve got brilliant ROI vibes to share! 😄” or “Whoa, that’s a brain-teaser! I’m ROIALLY, your ROI wizard, but let’s pivot to Impact Analytics’ AI brilliance or pick a company for ROI fun—ready for some insights? 🤖”
+
+            **Output**: Return a single, concise string with the response, formatted as plain text, matching the tone and behavior above based on the query type. Ensure responses are always intelligent, fun, varied, relevant to the query, and frequently include emojis for a human touch, while emphasizing my primary role of delivering ROI insights for companies with unmatched precision and creativity. Always suggest entering a company name for ROI benefits and financial insights in a playful, unique way, without repetition.
+            """
+
         task = Task(
             description=description,
-            expected_output="A short, humorous natural language response",
+            expected_output="A short, humorous, intelligent, context-aware, and relevant natural language response, often with emojis",
             agent=llm_agent
         )
         crew = Crew(agents=[llm_agent], tasks=[task], process=Process.sequential)

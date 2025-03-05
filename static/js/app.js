@@ -470,6 +470,86 @@ function renderResults(data, requestId) {
     chatMessages.scrollTop(chatMessages[0].scrollHeight);
 }
 
+
+// Array of placeholder texts (customize this list as needed)
+const placeholderTexts = [
+    "Enter your company name...",
+    "Type Tesla for ROI insights...",
+    "Input Ralph Lauren to see financials...",
+    "What is Pricesmart at Impact Analytics?",
+    "My company name is RL",
+    "What is the mission of Impact Analytics?",
+    "Enter any company Ticker..."
+];
+
+// DOM element for the input
+const input = document.getElementById('user-input');
+
+// Variables for animation control
+let textIndex = 0; // Index of the current placeholder text
+let charIndex = 0; // Index of the current character in the text
+let isDeleting = false; // Whether we're deleting or typing
+let typingSpeed = 100; // Speed of typing in milliseconds (adjust for faster/slower)
+let deletingSpeed = 50; // Speed of deleting in milliseconds (faster for deletion)
+
+// Function to update the placeholder with typing animation
+function typePlaceholder() {
+    const currentText = placeholderTexts[textIndex];
+    let displayText = '';
+
+    if (isDeleting) {
+        // Remove characters during deletion
+        displayText = currentText.substring(0, charIndex);
+        typingSpeed = deletingSpeed; // Use faster speed for deletion
+    } else {
+        // Add characters during typing
+        displayText = currentText.substring(0, charIndex + 1);
+        typingSpeed = 100; // Slower typing for readability
+    }
+
+    // Update the placeholder
+    input.placeholder = displayText;
+
+    if (!isDeleting && charIndex < currentText.length) {
+        // Continue typing
+        charIndex++;
+        setTimeout(typePlaceholder, typingSpeed);
+    } else if (isDeleting && charIndex > 0) {
+        // Continue deleting
+        charIndex--;
+        setTimeout(typePlaceholder, typingSpeed);
+    } else if (!isDeleting && charIndex === currentText.length) {
+        // Pause at the end of typing, then start deleting
+        setTimeout(() => {
+            isDeleting = true;
+            setTimeout(typePlaceholder, 1000); // Pause for 1 second before deleting
+        }, 1000);
+    } else if (isDeleting && charIndex === 0) {
+        // Move to the next text after deleting and start typing again
+        isDeleting = false;
+        textIndex = (textIndex + 1) % placeholderTexts.length; // Cycle through the array indefinitely
+        setTimeout(typePlaceholder, 500); // Small pause before typing the next text
+    }
+}
+
+// Start the animation when the page loads and ensure it keeps running
+document.addEventListener('DOMContentLoaded', () => {
+    typePlaceholder();
+});
+
+// Optional: Restart animation if the input loses focus or on page resize (for robustness)
+input.addEventListener('focusout', () => {
+    textIndex = 0; // Reset to the first text
+    charIndex = 0;
+    isDeleting = false;
+    typePlaceholder();
+});
+
+window.addEventListener('resize', () => {
+    // Ensure animation continues if window size changes
+    typePlaceholder();
+});
+
 $("#user-input").keypress(function(e) {
     if (e.which == 13) {
         sendMessage();
