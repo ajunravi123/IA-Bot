@@ -676,3 +676,142 @@ h1, h4 {
 .collapsing {
     opacity: 0.5; /* Fade effect during collapse */
 }
+
+
+
+
+
+
+
+
+.ticker-options-container {
+    padding: 15px;
+    background: rgba(10, 25, 47, 0.8); /* Dark semi-transparent blue */
+    border: 1px solid #00d4ff; /* Neon cyan border */
+    border-radius: 15px;
+    margin-top: 15px;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.ticker-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ticker-btn-custom {
+    background: linear-gradient(135deg, #1e3c72, #2a5298); /* Deep blue gradient */
+    color: #e0e0e0; /* Light gray text */
+    border: 1px solid #00b4d8; /* Slightly darker cyan border */
+    border-radius: 10px;
+    padding: 12px 18px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0, 180, 216, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.ticker-btn-custom::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+    transition: all 0.5s ease;
+}
+
+.ticker-btn-custom:hover::before {
+    left: 00%;
+}
+
+.ticker-btn-custom:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0, 212, 255, 0.5);
+    color: #fff;
+}
+
+/* Highlighted first option */
+.ticker-btn-custom.highlighted {
+    background: linear-gradient(135deg, #ff00cc, #00ffcc); /* Neon pink to cyan gradient */
+    border: 2px solid #ff00cc; /* Neon pink border */
+    color: #fff;
+    box-shadow: 0 0 15px rgba(255, 0, 204, 0.7), 0 0 25px rgba(0, 255, 204, 0.5);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+.ticker-btn-custom.highlighted:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0 20px rgba(255, 0, 204, 0.9), 0 0 30px rgba(0, 255, 204, 0.7);
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 15px rgba(255, 0, 204, 0.7), 0 0 25px rgba(0, 255, 204, 0.5); }
+    50% { box-shadow: 0 0 25px rgba(255, 0, 204, 1), 0 0 35px rgba(0, 255, 204, 0.8); }
+    100% { box-shadow: 0 0 15px rgba(255, 0, 204, 0.7), 0 0 25px rgba(0, 255, 204, 0.5); }
+}
+
+.ticker-name {
+    font-weight: 700;
+    font-family: 'Orbitron', sans-serif; /* Futuristic font */
+}
+
+.ticker-symbol {
+    font-size: 0.9em;
+    opacity: 0.85;
+    margin-left: 6px;
+    font-family: 'Roboto Mono', monospace; /* Monospace for symbols */
+}
+
+.auto-detect-box {
+    margin-top: 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, #2a2e45, #3e4265); /* Professional dark gradient */
+    border: 1px solid #4a90e2; /* Soft blue border */
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2); /* Subtle blue shadow */
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+/* .auto-detect-box:hover {
+    box-shadow: 0 6px 18px rgba(74, 144, 226, 0.4);
+    background: linear-gradient(135deg, #323759, #464b7a); 
+} */
+
+.auto-detect-btn {
+    background: none;
+    border: none;
+    color: #4a90e2; /* Professional blue text */
+    font-weight: 600;
+    font-size: 1.1em;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-family: 'Roboto', sans-serif; /* Clean, professional font */
+}
+
+.auto-detect-btn:hover {
+    color: #66aaff; /* Lighter blue on hover */
+    transform: scale(1.05);
+    text-shadow: 0 0 5px rgba(74, 144, 226, 0.5); /* Subtle glow */
+}
+
+.auto-detect-text {
+    display: inline-block;
+    padding: 0 10px;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#abtn {
+    background: #001747;
+    width: 21%;
+}

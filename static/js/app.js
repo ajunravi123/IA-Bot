@@ -24,6 +24,14 @@ socketMain.onopen = () => console.log("Main WebSocket (port 8000) opened at", ne
 socketPredefined.onopen = () => console.log("Predefined WebSocket (port 8001) opened at", new Date().toISOString());
 
 // Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
+
+// Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
+// Handle messages from socketMain (port 8000)
 socketMain.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log(`Main WS (8000) received at ${new Date().toISOString()}:`, data, "Request ID:", data.request_id);
@@ -68,13 +76,49 @@ socketMain.onmessage = function(event) {
         case "question":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`
+            $(`#container-${data.request_id} .message.user-message:last`).after(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                     ${data.message}
                     <span class="timestamp">${formatTimestamp()}</span>
                 </div>
             `);
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
+            break;
+        case "confirm_ticker":
+            $(`#loader-${data.request_id}`).remove();
+            $(`#agent-info-${data.request_id}`).remove();
+            const tickers = data.data.mached_tickers || [];
+            const lastUserInput = pendingRequests.get(data.request_id) || "Unknown input"; // Store last user input
+            // Append ticker options after the last user message in the same container
+            $(`#container-${data.request_id} .message.user-message:last`).after(`
+                <div class="message bot-message fade-in" id="ticker-message-${data.request_id}">
+                    <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
+                    <div class="message-content">
+                        <strong id="ticker-prompt-${data.request_id}">Did you mean one of these companies?</strong>
+                        <div class="ticker-options-container" id="ticker-options-${data.request_id}">
+                            <div class="ticker-options">
+                                ${tickers.map((ticker, index) => `
+                                    <button class="btn ticker-btn ticker-btn-custom fade-in ${index === 0 ? 'highlighted' : ''}" 
+                                            style="animation-delay: ${index * 0.1}s"
+                                            onclick="sendTickerSelection('${escapeSingleQuotes(ticker.name)}', '${ticker.symbol}', '${data.request_id}', false, '${escapeSingleQuotes(lastUserInput)}')">
+                                        <span class="ticker-name">${ticker.name}</span>
+                                        <span class="ticker-symbol">(${ticker.symbol})</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <div class="auto-detect-box">
+                                <button id="abtn" class="btn auto-detect-btn fade-in"
+                                        onclick="sendTickerSelection('', '', '${data.request_id}', true, '${escapeSingleQuotes(lastUserInput)}')">
+                                    <span class="auto-detect-text">Auto Detect</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="timestamp">${formatTimestamp()}</span>
+                </div>
+            `);
+            // chatMessages.scrollTop(chatMessages[0].scrollHeight);
             break;
         case "question_result":
             $(`#loader-${data.request_id}`).remove();
@@ -99,7 +143,7 @@ socketMain.onmessage = function(event) {
                     </div>
                 `;
             }
-            $(`#container-${data.request_id}`).append(`
+            $(`#container-${data.request_id} .message.user-message:last`).after(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                     <div class="message-content">
@@ -115,7 +159,7 @@ socketMain.onmessage = function(event) {
         case "message":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`
+            $(`#container-${data.request_id} .message.user-message:last`).after(`
                 <div class="message bot-message fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                     ${data.content}
@@ -123,17 +167,18 @@ socketMain.onmessage = function(event) {
                 </div>
             `);
             pendingRequests.delete(data.request_id);
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
             break;
         case "result":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove();
-            renderResults(data, data.request_id);
+            renderResults(data, data.request_id); // Assumes renderResults inserts after last user message
             pendingRequests.delete(data.request_id);
             break;
         case "error":
             $(`#loader-${data.request_id}`).remove();
             $(`#agent-info-${data.request_id}`).remove();
-            $(`#container-${data.request_id}`).append(`
+            $(`#container-${data.request_id} .message.user-message:last`).after(`
                 <div class="message bot-message text-danger fade-in">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                     Error: ${data.message}
@@ -141,9 +186,53 @@ socketMain.onmessage = function(event) {
                 </div>
             `);
             pendingRequests.delete(data.request_id);
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
             break;
     }
 };
+
+// Function to handle ticker selection (unchanged)
+function sendTickerSelection(companyName, tickerSymbol, parentRequestId, autoDetect = false, lastUserInput = '') {
+    let messageContent = {
+        type: "user_input",
+        content: autoDetect ? lastUserInput : companyName,
+        request_id: parentRequestId,
+        parent_request_id: parentRequestId
+    };
+
+    if (autoDetect) {
+        messageContent.auto_detect = true;
+    } else if (tickerSymbol) {
+        messageContent.ticker = tickerSymbol;
+    }
+
+    if (autoDetect) {
+        $(`#ticker-prompt-${parentRequestId}`).text("OK, you want to auto detect");
+    } else {
+        $(`#ticker-prompt-${parentRequestId}`).text(`OK, you want to go ahead with "${companyName}"`);
+    }
+
+    $(`#ticker-options-${parentRequestId}`).remove();
+
+    $(`#ticker-message-${parentRequestId}`).after(`
+        <div class="message user-message fade-in">
+            ${autoDetect ? lastUserInput : companyName}
+            <span class="timestamp">${formatTimestamp()}</span>
+        </div>
+        <div class="thinking-animation" id="loader-${parentRequestId}">
+            <div class="thinking-spinner"></div>
+            <div class="thinking-dot"></div>
+            <div class="thinking-dot"></div>
+            <div class="thinking-dot"></div>
+            <span class="agent-info" id="agent-info-${parentRequestId}"></span>
+        </div>
+    `);
+
+    socketMain.send(JSON.stringify(messageContent));
+    pendingRequests.set(parentRequestId, autoDetect ? lastUserInput : companyName);
+    // chatMessages.scrollTop(chatMessages[0].scrollHeight);
+}
+
 
 // Handle messages from socketPredefined (port 8001)
 socketPredefined.onmessage = function(event) {

@@ -255,10 +255,14 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 data_dict = json.loads(data)
                 user_input = data_dict.get("content", "").strip()
+                ticker = data_dict.get("ticker", "").strip()
                 request_id = data_dict.get("request_id", str(time.time()))
+                auto_detect = data_dict.get("auto_detect", False)
             except json.JSONDecodeError:
                 user_input = data.strip()
                 request_id = str(time.time())
+                ticker = ""
+                auto_detect = False
             print(f"Parsed Request ID: {request_id}, Input: {user_input}")
             
             # Send initial "thinking" with request_id
@@ -267,20 +271,39 @@ async def websocket_endpoint(websocket: WebSocket):
             retries = 0
             while retries < MAX_RETRIES:
                 try:
-                    # Use LLM to detect if it's a question                  
-                    analysis_result = await detect_question(user_input)
-                    is_question = analysis_result["is_question"]
-                    company = analysis_result["company"]
-                    if not is_question and company is not None and company != "":
-                        user_input = company
+                    # Use LLM to detect if it's a question  
+                    await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
+                    if ticker == "" and not auto_detect:              
+                        analysis_result = await detect_question(user_input)
+                        is_question = analysis_result["is_question"]
+                        company = analysis_result["company"]
+                        if not is_question and company is not None and company != "":
+                            user_input = company
 
+                        if not auto_detect and not is_question and user_input != "":
+                            if company is not None and company != "":
+                                await send_agent_update(websocket, "RetrievalAgent", "Fetching matches for " + company, request_id)
+                            mached_tickers = retrieval_agent.get_top_ticker_matches(user_input)
+                            if len(mached_tickers) > 0:
+                                await websocket.send_json({
+                                    "type": "confirm_ticker",  # Changed from "result" to "question_result"
+                                    "data": {
+                                        "mached_tickers":mached_tickers
+                                    },
+                                    "request_id": request_id
+                                })
+                                break
+                    else:
+                        user_input = ticker
+                        is_question = False
+                    
                     if is_question:
                         # Handle as a retrieval-based query (questions or non-financial statements)
-                        await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
+                        await send_agent_update(websocket, "RetrievalAgent", "Processing..", request_id)
                         response = generate_retrieval_response(user_input, is_question)
                         
                         await websocket.send_json({
-                            "type": "question_result",  # Changed from "result" to "question_result"
+                            "type": "question_result",
                             "data": {
                                 "matched_paragraphs": response[0],
                                 "urls": response[1]
