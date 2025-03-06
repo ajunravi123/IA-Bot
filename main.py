@@ -65,6 +65,10 @@ async def detect_question(text: str) -> dict:
            - Context and tone that differentiate it from a statement or command.
            - Do NOT rely on specific keywords or punctuation alone; focus on the overall intent, ignoring the case of letters (e.g., uppercase, lowercase, or mixed case should not affect the analysis).
 
+        Special Rule for Standalone or Meaningless Input:
+        - If the text is a single word or short phrase that appears meaningless (e.g., random letters like 'ABCD', 'xyz', or gibberish) or is just a proper noun/company name (e.g., 'Tesla', 'RL', 'SpaceX') without additional context suggesting a question or request, set 'is_question' to False. Examples include 'Tesla', 'RL', 'ABCD', 'xyz' when standalone.
+        - If the single word or phrase is part of a clear question or request (e.g., 'What is Tesla?', 'Tell me about RL'), then it can still be a question based on the phrasing.
+
         Special Rule for ROI/Financial Queries:
         - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, or similar financial metrics for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", or "find the balancesheet of [company]". Handle company names and financial terms case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are treated the same, and 'ROI', 'roi', 'Roi' are treated the same).
         - If the text asks about ROI, financial information, or balancesheet data but does NOT specify a company (e.g., "What is ROI?", "Explain financials"), set 'is_question' to True and return 'company' as null.
@@ -100,6 +104,10 @@ async def detect_question(text: str) -> dict:
         - "SOLVE X^2 = 16" -> {{"is_question": true, "company": null}}
         - "BYE" -> {{"is_question": true, "company": null}}
         - "TAKE CARE" -> {{"is_question": true, "company": null}}
+        - "Tesla" -> {{"is_question": false, "company": "Tesla"}}
+        - "RL" -> {{"is_question": false, "company": "RL"}}
+        - "ABCD" -> {{"is_question": false, "company": "ABCD"}}
+        - "xyz" -> {{"is_question": false, "company": "XYZ"}}
 
         Text: {text}
     """
