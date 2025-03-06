@@ -196,6 +196,8 @@ class CalculatorTool(BaseTool):
             except Exception as e:
                 print(f"Calculation failed: {str(e)}")
                 return {"low": "Not Available", "high": "Not Available"}
+            
+        headfix = 10
 
         results = {
             "Margin Rate Lift (bps)": safe_calc(
@@ -208,7 +210,7 @@ class CalculatorTool(BaseTool):
             ),
             "Efficiency Re-Investment": safe_calc(
                 percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
-                lambda x: (headcount - (headcount * 100 / (x + 100))) * salary_avg if headcount and salary_avg else "Not Available"
+                lambda x: (headfix - (headfix * 100 / (x + 100))) * salary_avg if headfix and salary_avg else "Not Available"
             ),
             "Reduction in Xfer Expenses": safe_calc(
                 percentages["Reduction in Xfer Expenses"][0], percentages["Reduction in Xfer Expenses"][1],
