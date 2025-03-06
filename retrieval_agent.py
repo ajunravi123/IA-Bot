@@ -6,7 +6,6 @@ from crewai import Agent
 from config import llm_client, ticker_json
 from dotenv import load_dotenv
 import json
-import torch
 from sentence_transformers.util import cos_sim
 
 load_dotenv()
