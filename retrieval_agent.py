@@ -3,9 +3,11 @@ import numpy as np
 from pathlib import Path
 from langchain.embeddings import HuggingFaceEmbeddings
 from crewai import Agent
-from config import llm_client
+from config import llm_client, ticker_json
 from dotenv import load_dotenv
 import json
+import torch
+from sentence_transformers.util import cos_sim
 
 load_dotenv()
 
@@ -93,6 +95,38 @@ class RetrievalAgent:
             "agent": self.agent,
             "callback": lambda result: self.get_matched_paragraphs(query)
         }
+    
+
+
+    def cosine_similarity(self, query_embedding, name_embeddings):
+        """Compute cosine similarity between query and stored embeddings."""
+        query_norm = np.linalg.norm(query_embedding)
+        name_norms = np.linalg.norm(name_embeddings, axis=1)
+        dot_products = np.dot(name_embeddings, query_embedding)
+        similarities = dot_products / (name_norms * query_norm)
+        return similarities
+
+    def get_top_ticker_matches(self, query, top_n=3):
+        """Find the most matched company names using AI-based semantic similarity."""
+        company_names = list(ticker_json.keys())  # Extract company names
+        symbols = list(ticker_json.values())      # Extract symbols
+        
+        # Compute embeddings for all company names
+        name_embeddings = np.array(self.embedding_model.embed_documents(company_names))
+        
+        # Compute embedding for query
+        query_embedding = np.array(self.embedding_model.embed_query(query))
+        
+        # Compute cosine similarity
+        similarities = self.cosine_similarity(query_embedding, name_embeddings)
+        
+        # Get top N matches
+        top_indices = np.argsort(similarities)[::-1][:top_n]
+        
+        # Return matched company names with symbols
+        results = [{"name": company_names[i], "symbol": symbols[i], "score": similarities[i]} for i in top_indices]
+        
+        return results
 
 # Singleton instance
 retrieval_agent_instance = RetrievalAgent()
