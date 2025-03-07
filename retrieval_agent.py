@@ -1,13 +1,41 @@
 import faiss
 import numpy as np
+import os
 from pathlib import Path
 from langchain.embeddings import HuggingFaceEmbeddings
 from crewai import Agent
 from config import llm_client, ticker_json
+from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 import json
 
 load_dotenv()
+
+
+JSON_FILE = "companies.json"  # Update with your actual JSON file
+EMBEDDINGS_FILE = "company_embeddings.npy"
+NAMES_FILE = "company_names.json"
+
+
+def load_embeddings():
+    """Load precomputed embeddings and company names."""
+    print("Loading precomputed embeddings...")
+    name_embeddings = np.load(EMBEDDINGS_FILE)
+
+    with open(NAMES_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    return name_embeddings, data["names"], data["symbols"]
+
+
+if not os.path.exists(EMBEDDINGS_FILE) or not os.path.exists(NAMES_FILE):
+    print("EMBEDDINGS FILE file is missing.")
+else:
+    name_embeddings, company_names, symbols = load_embeddings()
+    print("Ticker EMBEDDINGS loaded.")
+
+
+# Load cached embeddings
 
 class RetrievalAgent:
     def __init__(self, index_path="./vindex/combined_index.index", chunks_path="./vindex/combined_chunks_with_metadata.jsonl"):
@@ -96,31 +124,18 @@ class RetrievalAgent:
     
 
 
-    def cosine_similarity(self, query_embedding, name_embeddings):
-        """Compute cosine similarity between query and stored embeddings."""
-        query_norm = np.linalg.norm(query_embedding)
-        name_norms = np.linalg.norm(name_embeddings, axis=1)
-        dot_products = np.dot(name_embeddings, query_embedding)
-        similarities = dot_products / (name_norms * query_norm)
-        return similarities
-
     def get_top_ticker_matches(self, query, top_n=3):
         """Find the most matched company names using AI-based semantic similarity."""
-        company_names = list(ticker_json.keys())  # Extract company names
-        symbols = list(ticker_json.values())      # Extract symbols
         
-        # Compute embeddings for all company names
-        name_embeddings = np.array(self.embedding_model.embed_documents(company_names))
-        
-        # Compute embedding for query
-        query_embedding = np.array(self.embedding_model.embed_query(query))
-        
-        # Compute cosine similarity
-        similarities = self.cosine_similarity(query_embedding, name_embeddings)
-        
+        # Compute embedding for the query
+        query_embedding = np.array(self.embedding_model.embed_query(query)).reshape(1, -1)
+
+        # Compute cosine similarity using optimized sklearn function
+        similarities = cosine_similarity(query_embedding, name_embeddings)[0]
+
         # Get top N matches
         top_indices = np.argsort(similarities)[::-1][:top_n]
-        
+
         # Return matched company names with symbols
         results = [{"name": company_names[i], "symbol": symbols[i], "score": similarities[i]} for i in top_indices]
         
