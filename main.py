@@ -69,10 +69,10 @@ async def detect_question(text: str) -> dict:
         - If the text is a single word or short phrase that appears meaningless (e.g., random letters like 'ABCD', 'xyz', or gibberish) or is just a proper noun/company name (e.g., 'Tesla', 'RL', 'SpaceX') without additional context suggesting a question or request, set 'is_question' to False. Examples include 'Tesla', 'RL', 'ABCD', 'xyz' when standalone.
         - If the single word or phrase is part of a clear question or request (e.g., 'What is Tesla?', 'Tell me about RL'), then it can still be a question based on the phrasing.
 
-        Special Rule for ROI/Financial Queries:
-        - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, insights, data, details, summary, or similar financial or company-related metrics for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", "find the balancesheet of [company]", "provide insights for [company]", "summarize details of [company]", "show me the data of [company]". Handle company names and financial terms case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are treated the same, and 'ROI', 'roi', 'Roi', 'INSIGHTS', 'insights', 'Insights', 'DATA', 'data', 'Data' are treated the same).
-        - If the text asks about ROI, financial information, balancesheet data, insights, data, details, summary, or similar financial-related topics but does NOT specify a company (e.g., "What is ROI?", "Explain financials", "What are insights?", "What is data?"), set 'is_question' to True and return 'company' as null.
-        - Use your judgment to identify financial-related terms and company names based on context, without relying on hardcoded lists. Company names can be any proper noun or entity the user associates with financial data in the text, regardless of case.
+        Special Rule for ROI/Financial Queries and Company Information Requests:
+        - If the text explicitly requests return on investment (ROI), financial information, balancesheet data, insights, data, details, summary, or any additional company-related information (e.g., elaboration, explanation, overview, or more details) for a specific company (e.g., a proper noun or entity explicitly mentioned as a company), set 'is_question' to False and extract the company name. Examples include requests like "calculate the ROI of [company]", "show financials of [company]", "find the balancesheet of [company]", "provide insights for [company]", "summarize details of [company]", "show me the data of [company]", "tell me more about [company]", "explain [company] in more detail". Handle company names and related terms case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are treated the same, and 'ROI', 'roi', 'Roi', 'INSIGHTS', 'insights', 'Insights', 'DATA', 'data', 'Data' are treated the same).
+        - If the text asks about ROI, financial information, balancesheet data, insights, data, details, summary, or general company-related topics but does NOT specify a company (e.g., "What is ROI?", "Explain financials", "What are insights?", "What is data?", "Tell me more about companies"), set 'is_question' to True and return 'company' as null.
+        - Use your judgment to identify company-related terms and company names based on context, without relying on hardcoded lists. Company names can be any proper noun or entity the user associates with company data in the text, regardless of case.
 
         2. If the text contains a company name (a proper noun or entity explicitly mentioned as a company), extract it; otherwise, return null. Handle company names case-insensitively (e.g., 'TESLA', 'tesla', 'Tesla' are all recognized as "Tesla").
 
@@ -96,6 +96,16 @@ async def detect_question(text: str) -> dict:
         - "summarize details of RL" -> {{"is_question": false, "company": "RL"}}
         - "summarize key details about RL" -> {{"is_question": false, "company": "RL"}}
         - "show me the data of RL" -> {{"is_question": false, "company": "RL"}}
+        - "tell me more about RL" -> {{"is_question": false, "company": "RL"}}
+        - "I'd like to learn more about RL" -> {{"is_question": false, "company": "RL"}}
+        - "Can you provide more details on RL?" -> {{"is_question": false, "company": "RL"}}
+        - "Give me more insights on RL" -> {{"is_question": false, "company": "RL"}}
+        - "Explain RL in more detail" -> {{"is_question": false, "company": "RL"}}
+        - "I’m curious to learn more about RL" -> {{"is_question": false, "company": "RL"}}
+        - "Can you elaborate on RL?" -> {{"is_question": false, "company": "RL"}}
+        - "I need more information on RL" -> {{"is_question": false, "company": "RL"}}
+        - "Expand on RL for me" -> {{"is_question": false, "company": "RL"}}
+        - "Break down RL for me" -> {{"is_question": false, "company": "RL"}}
         - "what is ROI?" -> {{"is_question": true, "company": null}}
         - "EXPLAIN FINANCIALs" -> {{"is_question": true, "company": null}}
         - "What are insights?" -> {{"is_question": true, "company": null}}
