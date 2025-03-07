@@ -95,7 +95,7 @@ socketMain.onmessage = function(event) {
                 <div class="message bot-message fade-in" id="ticker-message-${data.request_id}">
                     <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
                     <div class="message-content">
-                        <strong id="ticker-prompt-${data.request_id}">Did you mean one of these companies?</strong>
+                        <strong id="ticker-prompt-${data.request_id}">If your company is in the list, tap to continue.</strong>
                         <div class="ticker-options-container" id="ticker-options-${data.request_id}">
                             <div class="ticker-options">
                                 ${tickers.map((ticker, index) => `
@@ -110,7 +110,7 @@ socketMain.onmessage = function(event) {
                             <div class="auto-detect-box">
                                 <button id="abtn" class="btn auto-detect-btn fade-in"
                                         onclick="sendTickerSelection('', '', '${data.request_id}', true, '${escapeSingleQuotes(lastUserInput)}')">
-                                    <span class="auto-detect-text">Auto Detect</span>
+                                    <span class="auto-detect-text">None of these? Do a deep search.</span>
                                 </button>
                             </div>
                         </div>
@@ -207,9 +207,9 @@ function sendTickerSelection(companyName, tickerSymbol, parentRequestId, autoDet
     }
 
     if (autoDetect) {
-        $(`#ticker-prompt-${parentRequestId}`).text("OK, you want to auto detect");
+        $(`#ticker-prompt-${parentRequestId}`).text("Ok, Expanding the search scope. Hang tight!");
     } else {
-        $(`#ticker-prompt-${parentRequestId}`).text(`OK, you want to go ahead with "${companyName}"`);
+        $(`#ticker-prompt-${parentRequestId}`).text(`Ok, you want to go ahead with "${companyName}"`);
     }
 
     $(`#ticker-options-${parentRequestId}`).remove();

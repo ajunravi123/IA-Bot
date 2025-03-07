@@ -734,7 +734,7 @@ h1, h4 {
 
 /* Highlighted first option */
 .ticker-btn-custom.highlighted {
-    background: linear-gradient(135deg, #ff00cc, #00ffcc); /* Neon pink to cyan gradient */
+    background: linear-gradient(135deg, #44c75d, #062139); /* Neon pink to cyan gradient */
     border: 2px solid #ff00cc; /* Neon pink border */
     color: #fff;
     box-shadow: 0 0 15px rgba(255, 0, 204, 0.7), 0 0 25px rgba(0, 255, 204, 0.5);
@@ -812,6 +812,6 @@ h1, h4 {
 }
 
 #abtn {
-    background: #001747;
-    width: 21%;
+    background: #000000;
+    border-radius: 28px;
 }

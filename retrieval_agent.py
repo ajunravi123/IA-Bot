@@ -14,24 +14,24 @@ load_dotenv()
 
 JSON_FILE = "companies.json"  # Update with your actual JSON file
 EMBEDDINGS_FILE = "company_embeddings.npy"
-NAMES_FILE = "company_names.json"
+NAMES_FILE = "company_names_symbols.json"
 
 
 def load_embeddings():
-    """Load precomputed embeddings and company names."""
+    """Load precomputed embeddings and company data."""
     print("Loading precomputed embeddings...")
-    name_embeddings = np.load(EMBEDDINGS_FILE)
+    embeddings = np.load(EMBEDDINGS_FILE)
 
     with open(NAMES_FILE, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    return name_embeddings, data["names"], data["symbols"]
+    return embeddings, data["names"], data["symbols"]
 
 
 if not os.path.exists(EMBEDDINGS_FILE) or not os.path.exists(NAMES_FILE):
     print("EMBEDDINGS FILE file is missing.")
 else:
-    name_embeddings, company_names, symbols = load_embeddings()
+    embeddings, company_names, company_symbols = load_embeddings()
     print("Ticker EMBEDDINGS loaded.")
 
 
@@ -125,20 +125,34 @@ class RetrievalAgent:
 
 
     def get_top_ticker_matches(self, query, top_n=3):
-        """Find the most matched company names using AI-based semantic similarity."""
-        
+        """Find the most relevant matches from both company names and symbols."""
+    
         # Compute embedding for the query
         query_embedding = np.array(self.embedding_model.embed_query(query)).reshape(1, -1)
 
-        # Compute cosine similarity using optimized sklearn function
-        similarities = cosine_similarity(query_embedding, name_embeddings)[0]
+        # Compute cosine similarity against all stored embeddings (names + symbols)
+        similarities = cosine_similarity(query_embedding, embeddings)[0]
 
         # Get top N matches
         top_indices = np.argsort(similarities)[::-1][:top_n]
 
-        # Return matched company names with symbols
-        results = [{"name": company_names[i], "symbol": symbols[i], "score": similarities[i]} for i in top_indices]
-        
+        results = []
+        half_length = len(company_names)  # Half embeddings are for names, half for symbols
+
+        for i in top_indices:
+            if i < half_length:
+                matched_name = company_names[i]
+                matched_symbol = company_symbols[i]  # Get the corresponding symbol
+            else:
+                matched_symbol = company_symbols[i - half_length]
+                matched_name = company_names[i - half_length]  # Get the corresponding name
+
+            results.append({
+                "name": matched_name,
+                "symbol": matched_symbol,
+                "score": similarities[i]
+            })
+
         return results
 
 # Singleton instance

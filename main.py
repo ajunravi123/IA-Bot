@@ -272,7 +272,7 @@ async def websocket_endpoint(websocket: WebSocket):
             while retries < MAX_RETRIES:
                 try:
                     # Use LLM to detect if it's a question  
-                    await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
+                    # await send_agent_update(websocket, "RetrievalAgent", "Thinking..", request_id)
                     # analysis_result = await detect_question(user_input)
                     # is_question = analysis_result["is_question"]
                     # company = analysis_result["company"]
@@ -300,12 +300,12 @@ async def websocket_endpoint(websocket: WebSocket):
                                 })
                                 break
                     else:
-                        user_input = ticker
+                        user_input = user_input if auto_detect else ticker
                         is_question = False
                     
                     if is_question:
                         # Handle as a retrieval-based query (questions or non-financial statements)
-                        await send_agent_update(websocket, "RetrievalAgent", "Processing..", request_id)
+                        await send_agent_update(websocket, "RetrievalAgent", "Thinking", request_id)
                         response = generate_retrieval_response(user_input, is_question)
                         
                         await websocket.send_json({
