@@ -815,3 +815,57 @@ h1, h4 {
     background: #000000;
     border-radius: 28px;
 }
+
+
+
+
+
+
+
+
+
+
+/* Mode Toggle Container */
+.mode-toggle {
+    position: absolute;
+    top: 5px;
+    right: 13px;
+    z-index: 10;
+}
+
+/* Button Group Styling */
+.btn-group {
+    font-size: 12px;
+    border-radius: 8px;
+    overflow: hidden; /* Clean edges */
+}
+
+/* Mode Buttons */
+.btn-mode {
+    background-color: #e6e9f0; /* Light gray background */
+    color: #1e40af; /* Dark blue text */
+    border: 1px solid #3b82f6; /* Blue border */
+    padding: 5px 10px;
+    font-size: 0.85em; /* Smaller text */
+    font-family: 'Humanist', sans-serif; /* Match your font */
+    transition: all 0.3s ease;
+}
+
+.btn-mode:hover {
+    background-color: #dbe2ff; /* Lighter blue on hover */
+    color: #1e3a8a; /* Darker blue text */
+}
+
+.btn-mode.active {
+    background-color: #3b82f6; /* Active mode blue */
+    color: #ffffff; /* White text */
+    border-color: #1e40af; /* Darker blue border */
+}
+
+/* Ensure chat container accommodates toggle */
+#chat-container {
+    position: relative; /* Allow absolute positioning of toggle */
+    padding-top: 40px; /* Add space for toggle */
+}
+
+
