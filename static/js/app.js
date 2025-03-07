@@ -3,6 +3,7 @@ const socketMain = new WebSocket(`ws://${window.location.host}/ws`);
 // WebSocket for predefined questions (port 8001)
 const socketPredefined = new WebSocket(`ws://${window.location.host.replace(':8000', ':8001')}/ws`);
 const chatMessages = $("#chat-messages");
+let current_mode = "smart_detect"; //smart_detect, roi_mode, asking_about_ia
 
 // Function to format timestamp as "HH:MM AM/PM"
 function formatTimestamp() {
@@ -197,7 +198,8 @@ function sendTickerSelection(companyName, tickerSymbol, parentRequestId, autoDet
         type: "user_input",
         content: autoDetect ? lastUserInput : companyName,
         request_id: parentRequestId,
-        parent_request_id: parentRequestId
+        parent_request_id: parentRequestId,
+        current_mode : current_mode
     };
 
     if (autoDetect) {
@@ -325,7 +327,7 @@ function sendMessage() {
                     </div>
                 </div>
             `);
-            socketMain.send(JSON.stringify({ type: "user_input", content: message, request_id: requestId }));
+            socketMain.send(JSON.stringify({ type: "user_input", content: message, request_id: requestId, current_mode : current_mode }));
             pendingRequests.set(requestId, message);
         }
         chatMessages.scrollTop(chatMessages[0].scrollHeight);
@@ -643,4 +645,15 @@ $("#user-input").keypress(function(e) {
     if (e.which == 13) {
         sendMessage();
     }
+});
+
+
+$(document).ready(function() {
+    $('.btn-mode').click(function() {
+        $('.btn-mode').removeClass('active');
+        $(this).addClass('active');
+        const mode = $(this).data('mode');
+        current_mode = $(this).attr("mode_name");
+        console.log('Mode switched to:', mode);
+    });
 });
