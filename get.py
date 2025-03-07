@@ -3,15 +3,18 @@ import numpy as np
 from langchain.embeddings import HuggingFaceEmbeddings
 
 # Load the embedding model
+print("Model is loading..")
 embedding_model = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en")
 
 def load_company_data(json_file):
     """Load company names and symbols from a JSON file."""
+    print("File is loading..")
     with open(json_file, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def cosine_similarity(query_embedding, name_embeddings):
     """Compute cosine similarity between query and stored embeddings."""
+    print("Checking....")
     query_norm = np.linalg.norm(query_embedding)
     name_norms = np.linalg.norm(name_embeddings, axis=1)
     dot_products = np.dot(name_embeddings, query_embedding)
@@ -43,10 +46,13 @@ def get_top_matches(query, json_file, top_n=5):
     return results
 
 # Example Usage:
-json_file = "companies.json"  # Your JSON file path
+json_file = "companies_small.json"  # Your JSON file path
 query = "Microsoft Corporation"
 matches = get_top_matches(query, json_file)
 
+print("got it")
 # Display results
 for match in matches:
     print(f"{match['name']} ({match['symbol']}) - Similarity Score: {match['score']:.4f}")
+
+print("Done")
