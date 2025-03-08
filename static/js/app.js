@@ -444,6 +444,7 @@ function renderResults(data, requestId) {
     let sourcesSection = '';
     let chartData = null;
 
+    // Financial Data Table
     if (data.data && data.data.financial_data && typeof data.data.financial_data === 'object') {
         const currency = data.data.financial_data.currency || '';
         financialTable = `
@@ -476,45 +477,53 @@ function renderResults(data, requestId) {
         `;
     }
 
-    if (data.data && data.data.benefits && typeof data.data.benefits === 'object') {
+    // Benefits Table (Updated to handle nested structure)
+    if (data.data && data.data.benefits && data.data.benefits.benefits && typeof data.data.benefits.benefits === 'object') {
         const currency = data.data.financial_data ? data.data.financial_data.currency || '' : '';
         benefitsTable = `
             <div class="benefits-content">
                 <h4>Calculated Benefits</h4>
-                <table class="table table-dark table-striped mt-3">
-                    <thead>
-                        <tr>
-                            <th>Benefit</th>
-                            <th>Low Estimate</th>
-                            <th>High Estimate</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${Object.entries(data.data.benefits).map(([key, value]) => `
+                ${Object.entries(data.data.benefits.benefits).map(([category, metrics]) => `
+                    <h5>${category.replace(/_/g, ' ')}</h5>
+                    <table class="table table-dark table-striped mt-3">
+                        <thead>
                             <tr>
-                                <td>${key.replace(/_/g, ' ')}</td>
-                                <td>${value.low || 'N/A'}</td>
-                                <td>${value.high || 'N/A'}</td>
+                                <th>Metric</th>
+                                <th>Low Estimate</th>
+                                <th>High Estimate</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(metrics).map(([metric, values]) => `
+                                <tr>
+                                    <td>${metric}</td>
+                                    <td>${values.low === "Not Available" ? 'N/A' : values.low}</td>
+                                    <td>${values.high === "Not Available" ? 'N/A' : values.high}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `).join('')}
             </div>
         `;
 
-        const labels = Object.keys(data.data.benefits);
-        const lowValues = labels.map(key => parseBenefitValue(data.data.benefits[key].low));
-        const highValues = labels.map(key => parseBenefitValue(data.data.benefits[key].high));
-        const canvasId = `benefitsChart_${requestId}`; // Use requestId for uniqueness
-        barChart = `
-            <div class="chart-content">
-                <h4>Benefits Bar Graph</h4>
-                <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
-            </div>
-        `;
-        chartData = { canvasId, labels, lowValues, highValues, currency };
+        // Prepare data for the bar chart using the "sum" object
+        if (data.data.benefits.sum && typeof data.data.benefits.sum === 'object') {
+            const labels = Object.keys(data.data.benefits.sum);
+            const lowValues = labels.map(key => parseBenefitValue(data.data.benefits.sum[key].low));
+            const highValues = labels.map(key => parseBenefitValue(data.data.benefits.sum[key].high));
+            const canvasId = `benefitsChart_${requestId}`; // Use requestId for uniqueness
+            barChart = `
+                <div class="chart-content">
+                    <h4>Benefits Summary Bar Graph</h4>
+                    <canvas id="${canvasId}" width="400" height="200" class="mt-3"></canvas>
+                </div>
+            `;
+            chartData = { canvasId, labels, lowValues, highValues, currency };
+        }
     }
 
+    // Sources Section (unchanged)
     if (data.data && data.data.urls && Array.isArray(data.data.urls) && data.data.urls.length > 0) {
         sourcesSection = `
             <div class="sources-content mt-3">
@@ -535,8 +544,10 @@ function renderResults(data, requestId) {
         `;
     }
 
+    // Summary (unchanged)
     summary = data.data.summary || (data.data.benefits ? 'Financial benefits calculated.' : 'No benefits calculated due to insufficient data.');
 
+    // Append everything to the chat container
     $(`#container-${requestId}`).append(`
         <div class="message bot-message fade-in">
             <img src="/static/images/bot-icon.png" alt="ROIALLY" class="message-icon">
@@ -551,11 +562,11 @@ function renderResults(data, requestId) {
         </div>
     `);
 
-    // Only create the chart if chartData exists
+    // Create the chart if chartData exists
     if (chartData) {
         createBarChart(chartData.canvasId, chartData.labels, chartData.lowValues, chartData.highValues, chartData.currency);
     } else {
-        console.log("No benefits data available to generate chart.");
+        console.log("No benefits sum data available to generate chart.");
     }
 
     chatMessages.scrollTop(chatMessages[0].scrollHeight);

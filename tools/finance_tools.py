@@ -100,90 +100,179 @@ class CalculatorTool(BaseTool):
     description: str = "Calculates financial benefits based on company financial data and company type determined by revenue."
 
     benefit_mapping: Dict[str, Dict[str, Tuple[float, float]]] = {
-        "Global": {
-            "Margin Rate Lift (bps)": (1.00, 1.50),
-            "Margin on Revenue Lift": (0.50, 1.00),
-            "Efficiency Re-Investment": (100, 200),
-            "Reduction in Xfer Expenses": (0.020, 0.024),
-            "Inventory Carrying Costs": (5.0, 12.0)
+        "allocation_and_replenishment" : {
+            "Global": {
+                "Margin Rate Lift (bps)": (1.00, 1.50),
+                "Margin on Revenue Lift": (0.50, 1.00),
+                "Efficiency Re-Investment": (100, 200),
+                "Reduction in Xfer Expenses": (0.020, 0.024),
+                "Inventory Carrying Costs": (5.0, 12.0)
+            },
+            "Leader": {
+                "Margin Rate Lift (bps)": (0.75, 1.20),
+                "Margin on Revenue Lift": (0.40, 0.80),
+                "Efficiency Re-Investment": (75, 150),
+                "Reduction in Xfer Expenses": (0.015, 0.020),
+                "Inventory Carrying Costs": (3.0, 10.0)
+            },
+            "Challenger": {
+                "Margin Rate Lift (bps)": (0.50, 1.00),
+                "Margin on Revenue Lift": (0.30, 0.60),
+                "Efficiency Re-Investment": (50, 100),
+                "Reduction in Xfer Expenses": (0.010, 0.016),
+                "Inventory Carrying Costs": (2.0, 8.0)
+            },
+            "Startup": {
+                "Margin Rate Lift (bps)": (0.25, 0.80),
+                "Margin on Revenue Lift": (0.10, 0.50),
+                "Efficiency Re-Investment": (30, 80),
+                "Reduction in Xfer Expenses": (0.005, 0.012),
+                "Inventory Carrying Costs": (1.0, 5.0)
+            }
         },
-        "Leader": {
-            "Margin Rate Lift (bps)": (0.75, 1.20),
-            "Margin on Revenue Lift": (0.40, 0.80),
-            "Efficiency Re-Investment": (75, 150),
-            "Reduction in Xfer Expenses": (0.015, 0.020),
-            "Inventory Carrying Costs": (3.0, 10.0)
+        "assortment_and_space" : {
+            "Global": {
+                "Margin Rate Lift (bps)": (0.80, 1.40),
+                "Margin on Revenue Lift": (0.40, 0.90),
+                "Efficiency Re-Investment": (90, 180),
+                "Reduction in Xfer Expenses": (0.018, 0.022),
+                "Inventory Carrying Costs": (4.5, 11.0)
+            },
+            "Leader": {
+                "Margin Rate Lift (bps)": (0.60, 1.10),
+                "Margin on Revenue Lift": (0.35, 0.75),
+                "Efficiency Re-Investment": (70, 140),
+                "Reduction in Xfer Expenses": (0.013, 0.018),
+                "Inventory Carrying Costs": (3.0, 9.0)
+            },
+            "Challenger": {
+                "Margin Rate Lift (bps)": (0.40, 0.90),
+                "Margin on Revenue Lift": (0.25, 0.55),
+                "Efficiency Re-Investment": (45, 90),
+                "Reduction in Xfer Expenses": (0.009, 0.014),
+                "Inventory Carrying Costs": (1.8, 7.5)
+            },
+            "Startup": {
+                "Margin Rate Lift (bps)": (0.20, 0.70),
+                "Margin on Revenue Lift": (0.08, 0.45),
+                "Efficiency Re-Investment": (25, 70),
+                "Reduction in Xfer Expenses": (0.004, 0.010),
+                "Inventory Carrying Costs": (0.8, 4.5)
+            }
         },
-        "Challenger": {
-            "Margin Rate Lift (bps)": (0.50, 1.00),
-            "Margin on Revenue Lift": (0.30, 0.60),
-            "Efficiency Re-Investment": (50, 100),
-            "Reduction in Xfer Expenses": (0.010, 0.016),
-            "Inventory Carrying Costs": (2.0, 8.0)
+        "merch_financial_planning" : {
+            "Global": {
+                "Margin Rate Lift (bps)": (1.10, 1.60),
+                "Margin on Revenue Lift": (0.55, 1.10),
+                "Efficiency Re-Investment": (110, 220),
+                "Reduction in Xfer Expenses": (0.025, 0.030),
+                "Inventory Carrying Costs": (6.0, 14.0)
+            },
+            "Leader": {
+                "Margin Rate Lift (bps)": (0.85, 1.30),
+                "Margin on Revenue Lift": (0.45, 0.90),
+                "Efficiency Re-Investment": (85, 170),
+                "Reduction in Xfer Expenses": (0.018, 0.024),
+                "Inventory Carrying Costs": (4.0, 11.0)
+            },
+            "Challenger": {
+                "Margin Rate Lift (bps)": (0.60, 1.10),
+                "Margin on Revenue Lift": (0.35, 0.70),
+                "Efficiency Re-Investment": (60, 120),
+                "Reduction in Xfer Expenses": (0.012, 0.018),
+                "Inventory Carrying Costs": (3.0, 9.0)
+            },
+            "Startup": {
+                "Margin Rate Lift (bps)": (0.30, 0.85),
+                "Margin on Revenue Lift": (0.12, 0.55),
+                "Efficiency Re-Investment": (40, 90),
+                "Reduction in Xfer Expenses": (0.006, 0.014),
+                "Inventory Carrying Costs": (1.5, 6.0)
+            }
         },
-        "Startup": {
-            "Margin Rate Lift (bps)": (0.25, 0.80),
-            "Margin on Revenue Lift": (0.10, 0.50),
-            "Efficiency Re-Investment": (30, 80),
-            "Reduction in Xfer Expenses": (0.005, 0.012),
-            "Inventory Carrying Costs": (1.0, 5.0)
-        }
+        "pricing": {
+            "Global": {
+                "Base - Margin on Revenue Lift": (0.50, 1.00),
+                "Base - Margin Rate Lift (bps)": (1.00, 1.50),
+                "Promo - Margin on Revenue Lift": (0.30, 0.80),
+                "Promo - Margin Rate Lift (bps)": (0.75, 1.25),
+                "MD - Margin on Revenue Lift": (0.20, 0.60),
+                "MD - Margin Rate Lift (bps)": (0.50, 1.00),
+                "Efficiency Re-Investment": (100, 200)
+            },
+            "Leader": {
+                "Base - Margin on Revenue Lift": (0.40, 0.80),
+                "Base - Margin Rate Lift (bps)": (0.75, 1.20),
+                "Promo - Margin on Revenue Lift": (0.25, 0.65),
+                "Promo - Margin Rate Lift (bps)": (0.60, 1.00),
+                "MD - Margin on Revenue Lift": (0.15, 0.50),
+                "MD - Margin Rate Lift (bps)": (0.40, 0.90),
+                "Efficiency Re-Investment": (75, 150)
+            },
+            "Challenger": {
+                "Base - Margin on Revenue Lift": (0.30, 0.60),
+                "Base - Margin Rate Lift (bps)": (0.50, 1.00),
+                "Promo - Margin on Revenue Lift": (0.20, 0.50),
+                "Promo - Margin Rate Lift (bps)": (0.40, 0.80),
+                "MD - Margin on Revenue Lift": (0.10, 0.40),
+                "MD - Margin Rate Lift (bps)": (0.30, 0.70),
+                "Efficiency Re-Investment": (50, 100)
+            },
+            "Startup": {
+                "Base - Margin on Revenue Lift": (0.20, 0.50),
+                "Base - Margin Rate Lift (bps)": (0.25, 0.80),
+                "Promo - Margin on Revenue Lift": (0.10, 0.40),
+                "Promo - Margin Rate Lift (bps)": (0.25, 0.60),
+                "MD - Margin on Revenue Lift": (0.05, 0.30),
+                "MD - Margin Rate Lift (bps)": (0.20, 0.50),
+                "Efficiency Re-Investment": (30, 80)
+            }
+        }    
     }
 
     def _run(self, financial_data: dict) -> dict:
         def parse_currency(value: str) -> float:
-            """Parse formatted currency strings (e.g., 'USD 96.77B') into a float."""
+            """Parse formatted currency strings (e.g., 'USD 6.63 B') into a float."""
             if value == "Not Available" or value is None:
                 return 0
             try:
                 value = str(value).replace(',', '').strip()
-                # Remove currency prefix (e.g., "USD ")
-                value = re.sub(r'^[A-Z]{3}\s+', '', value)
-                if 'B' in value.upper():
-                    return float(value.replace('B', '').strip()) * 1e9
-                elif 'M' in value.upper():
-                    return float(value.replace('M', '').strip()) * 1e6
-                elif 'K' in value.upper():
-                    return float(value.replace('K', '').strip()) * 1e3
-                else:
+                match = re.search(r'(\d+\.?\d*)\s*([BKM]?)', value, re.IGNORECASE)
+                if not match:
                     return float(value)
-            except (ValueError, AttributeError):
+                num = float(match.group(1))
+                multiplier = match.group(2).upper() if match.group(2) else ''
+                return num * (1e9 if multiplier == 'B' else 1e6 if multiplier == 'M' else 1e3 if multiplier == 'K' else 1)
+            except (ValueError, AttributeError) as e:
+                print(f"Error parsing currency '{value}': {str(e)}")
                 return 0
 
         def get_company_type(revenue):
-            if isinstance(revenue, str):
-                revenue = parse_currency(revenue)
-            print(f"Parsed Revenue for company type: {revenue}")
-            if not isinstance(revenue, (int, float)) or revenue <= 0:
+            revenue_val = parse_currency(revenue) if isinstance(revenue, str) else revenue if revenue != "Not Available" else 0
+            print(f"Parsed Revenue for company type: {revenue_val}")
+            if not isinstance(revenue_val, (int, float)) or revenue_val <= 0:
                 return "Startup"
-            if revenue > 50e9:
+            if revenue_val > 50e9:
                 return "Global"
-            elif revenue > 10e9:
+            elif revenue_val > 10e9:
                 return "Leader"
-            elif revenue > 1e9:
+            elif revenue_val > 1e9:
                 return "Challenger"
             else:
                 return "Startup"
 
         print(f"Financial Data Input: {financial_data}")
-        company_type = get_company_type(financial_data.get("Revenue", 0))
+        company_type = get_company_type(financial_data.get("Revenue", "Not Available"))
         print(f"Company Type: {company_type}")
-        percentages = self.benefit_mapping.get(company_type, self.benefit_mapping["Startup"])
-        
-        revenue = financial_data.get("Revenue", "Not Available")
-        inventory_cost = financial_data.get("balance_sheet_inventory_cost", "Not Available")
-        gross_profit = financial_data.get("gross_profit", "Not Available")
-        gross_profit_pct = financial_data.get("gross_profit_percentage", "Not Available")
-        headcount = financial_data.get("Headcount Old", "Not Available")
-        salary_avg = financial_data.get("Salary Average", "Not Available")
-        currency = financial_data.get("currency", "USD")
 
-        revenue = parse_currency(revenue) if isinstance(revenue, str) else revenue if revenue != "Not Available" else 0
-        inventory_cost = parse_currency(inventory_cost) if isinstance(inventory_cost, str) else inventory_cost if inventory_cost != "Not Available" else 0
-        gross_profit = parse_currency(gross_profit) if isinstance(gross_profit, str) else gross_profit if gross_profit != "Not Available" else 0
-        gross_profit_pct = float(gross_profit_pct) if isinstance(gross_profit_pct, (str, int, float)) and gross_profit_pct != "Not Available" else 0
-        headcount = int(str(headcount).replace(',', '')) if isinstance(headcount, str) and headcount != "Not Available" else headcount if headcount != "Not Available" else 0
-        salary_avg = parse_currency(salary_avg) if isinstance(salary_avg, str) else salary_avg if salary_avg != "Not Available" else 0
+        # Parse financial data
+        revenue = parse_currency(financial_data.get("Revenue", "Not Available"))
+        inventory_cost = parse_currency(financial_data.get("balance_sheet_inventory_cost", "Not Available"))
+        gross_profit = parse_currency(financial_data.get("gross_profit", "Not Available"))
+        gross_profit_pct = float(financial_data.get("gross_profit_percentage", "Not Available") or 0)
+        headcount = int(str(financial_data.get("Headcount Old", "Not Available")).replace(',', '')) if str(financial_data.get("Headcount Old", "Not Available")).replace(',', '').isdigit() else 0
+        salary_avg = parse_currency(financial_data.get("Salary Average", "Not Available"))
+        currency = financial_data.get("currency", "USD")
 
         print(f"Parsed Values - Revenue: {revenue}, Inventory Cost: {inventory_cost}, Gross Profit: {gross_profit}, Gross Profit %: {gross_profit_pct}, Headcount: {headcount}, Salary Avg: {salary_avg}")
 
@@ -191,38 +280,167 @@ class CalculatorTool(BaseTool):
             try:
                 low_val = calc_func(low)
                 high_val = calc_func(high)
-                print(f"Calculated - Low: {low_val}, High: {high_val}")
-                return {"low": format_amount(low_val, currency), "high": format_amount(high_val, currency)}
+                # Only format if calculation succeeds and values are valid
+                if low_val is not None and high_val is not None and isinstance(low_val, (int, float)) and isinstance(high_val, (int, float)):
+                    print(f"Calculated - Low: {low_val}, High: {high_val}")
+                    return {"low": format_amount(low_val, currency), "high": format_amount(high_val, currency)}
+                else:
+                    raise ValueError("Calculation returned invalid values")
             except Exception as e:
                 print(f"Calculation failed: {str(e)}")
                 return {"low": "Not Available", "high": "Not Available"}
-            
-        headfix = 10
 
-        results = {
+        def calculate_benefit_sums(benefits_dict):
+            result = {}
+            benefits = benefits_dict["benefits"]
+            for category, metrics in benefits.items():
+                low_sum = 0
+                high_sum = 0
+                for metric, values in metrics.items():
+                    low_val = parse_currency(values["low"]) if isinstance(values["low"], str) else 0
+                    high_val = parse_currency(values["high"]) if isinstance(values["high"], str) else 0
+                    low_sum += low_val
+                    high_sum += high_val
+                result[category] = {
+                    "low": format_amount(low_sum, currency) if low_sum > 0 else "Not Available",
+                    "high": format_amount(high_sum, currency) if high_sum > 0 else "Not Available"
+                }
+            return result
+
+        headfix = 10
+        price_benefit_headfix = 2
+        final_results = {"benefits": {}, "sum": {}}
+
+        # Allocation and Replenishment
+        all_percentages = self.benefit_mapping.get("allocation_and_replenishment")
+        percentages = all_percentages.get(company_type, all_percentages["Startup"])
+        allocation_and_replenishment = {
             "Margin Rate Lift (bps)": safe_calc(
                 percentages["Margin Rate Lift (bps)"][0], percentages["Margin Rate Lift (bps)"][1],
-                lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else "Not Available"
+                lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else None
             ),
             "Margin on Revenue Lift": safe_calc(
                 percentages["Margin on Revenue Lift"][0], percentages["Margin on Revenue Lift"][1],
-                lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else "Not Available"
+                lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else None
             ),
             "Efficiency Re-Investment": safe_calc(
                 percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
-                lambda x: (headfix - (headfix * 100 / (x + 100))) * salary_avg if headfix and salary_avg else "Not Available"
+                lambda x: (headfix - (headfix * 100 / (x + 100))) * salary_avg if salary_avg else None
             ),
             "Reduction in Xfer Expenses": safe_calc(
                 percentages["Reduction in Xfer Expenses"][0], percentages["Reduction in Xfer Expenses"][1],
-                lambda x: (x / 100) * inventory_cost if inventory_cost else "Not Available"
+                lambda x: (x / 100) * inventory_cost if inventory_cost else None
             ),
             "Inventory Carrying Costs": safe_calc(
                 percentages["Inventory Carrying Costs"][0], percentages["Inventory Carrying Costs"][1],
-                lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else "Not Available"
+                lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else None
             )
         }
-        print(f"Final Results: {results}")
-        return results
+        final_results["benefits"]["allocation_and_replenishment"] = allocation_and_replenishment
+
+        # Assortment and Space (similar updates as above)
+        all_percentages = self.benefit_mapping.get("assortment_and_space")
+        percentages = all_percentages.get(company_type, all_percentages["Startup"])
+        assortment_and_space = {
+            "Margin Rate Lift (bps)": safe_calc(
+                percentages["Margin Rate Lift (bps)"][0], percentages["Margin Rate Lift (bps)"][1],
+                lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else None
+            ),
+            "Margin on Revenue Lift": safe_calc(
+                percentages["Margin on Revenue Lift"][0], percentages["Margin on Revenue Lift"][1],
+                lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else None
+            ),
+            "Efficiency Re-Investment": safe_calc(
+                percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
+                lambda x: (headfix - (headfix * 100 / (x + 100))) * salary_avg if salary_avg else None
+            ),
+            "Reduction in Xfer Expenses": safe_calc(
+                percentages["Reduction in Xfer Expenses"][0], percentages["Reduction in Xfer Expenses"][1],
+                lambda x: (x / 100) * inventory_cost if inventory_cost else None
+            ),
+            "Inventory Carrying Costs": safe_calc(
+                percentages["Inventory Carrying Costs"][0], percentages["Inventory Carrying Costs"][1],
+                lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else None
+            )
+        }
+        final_results["benefits"]["assortment_and_space"] = assortment_and_space
+
+        # Merch Financial Planning (similar updates as above)
+        all_percentages = self.benefit_mapping.get("merch_financial_planning")
+        percentages = all_percentages.get(company_type, all_percentages["Startup"])
+        merch_financial_planning = {
+            "Margin Rate Lift (bps)": safe_calc(
+                percentages["Margin Rate Lift (bps)"][0], percentages["Margin Rate Lift (bps)"][1],
+                lambda x: (revenue * ((gross_profit_pct / 100) + (x / 100))) - gross_profit if revenue and gross_profit else None
+            ),
+            "Margin on Revenue Lift": safe_calc(
+                percentages["Margin on Revenue Lift"][0], percentages["Margin on Revenue Lift"][1],
+                lambda x: ((revenue * (1 + (x / 100))) * (gross_profit_pct / 100)) - gross_profit if revenue and gross_profit else None
+            ),
+            "Efficiency Re-Investment": safe_calc(
+                percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
+                lambda x: (headfix - (headfix * 100 / (x + 100))) * salary_avg if salary_avg else None
+            ),
+            "Inventory Carrying Costs": safe_calc(
+                percentages["Inventory Carrying Costs"][0], percentages["Inventory Carrying Costs"][1],
+                lambda x: (inventory_cost * 0.2) * (x / 100) if inventory_cost else None
+            )
+        }
+        final_results["benefits"]["merch_financial_planning"] = merch_financial_planning
+
+        # Pricing (similar updates as above)
+        all_percentages = self.benefit_mapping.get("pricing")
+        percentages = all_percentages.get(company_type, all_percentages["Startup"])
+        sales_on_base_price_sales_perct_ttl = 0.50
+        sales_on_base_price_gm_perct = 0.35
+        sales_on_base_promotional_event_sales_perct_ttl = 0.35
+        sales_on_base_promotional_event_gm_perct = 0.25
+        sales_on_markdown_sales_perct_ttl = 0.15
+        sales_on_markdown_gm_perct = 0.10
+
+        pricing = {
+            "Base - Margin on Revenue Lift": safe_calc(
+                percentages["Base - Margin on Revenue Lift"][0], percentages["Base - Margin on Revenue Lift"][1],
+                lambda x: (((sales_on_base_price_sales_perct_ttl * revenue) * (1 + (x / 100)) * sales_on_base_price_gm_perct) - 
+                        ((sales_on_base_price_sales_perct_ttl * revenue) * sales_on_base_price_gm_perct)) if revenue else None
+            ),
+            "Base - Margin Rate Lift (bps)": safe_calc(
+                percentages["Base - Margin Rate Lift (bps)"][0], percentages["Base - Margin Rate Lift (bps)"][1],
+                lambda x: (((sales_on_base_price_sales_perct_ttl * revenue) * (sales_on_base_price_gm_perct + (x / 100))) - 
+                        ((sales_on_base_price_sales_perct_ttl * revenue) * sales_on_base_price_gm_perct)) if revenue else None
+            ),
+            "Promo - Margin on Revenue Lift": safe_calc(
+                percentages["Promo - Margin on Revenue Lift"][0], percentages["Promo - Margin on Revenue Lift"][1],
+                lambda x: (((sales_on_base_promotional_event_sales_perct_ttl * revenue) * (1 + (x / 100)) * sales_on_base_promotional_event_gm_perct) - 
+                        ((sales_on_base_promotional_event_sales_perct_ttl * revenue) * sales_on_base_promotional_event_gm_perct)) if revenue else None
+            ),
+            "Promo - Margin Rate Lift (bps)": safe_calc(
+                percentages["Promo - Margin Rate Lift (bps)"][0], percentages["Promo - Margin Rate Lift (bps)"][1],
+                lambda x: (((sales_on_base_promotional_event_sales_perct_ttl * revenue) * (sales_on_base_promotional_event_gm_perct + (x / 100))) - 
+                        ((sales_on_base_promotional_event_sales_perct_ttl * revenue) * sales_on_base_promotional_event_gm_perct)) if revenue else None
+            ),
+            "MD - Margin on Revenue Lift": safe_calc(
+                percentages["MD - Margin on Revenue Lift"][0], percentages["MD - Margin on Revenue Lift"][1],
+                lambda x: (((sales_on_markdown_sales_perct_ttl * revenue) * (1 + (x / 100)) * sales_on_markdown_gm_perct) - 
+                        ((sales_on_markdown_sales_perct_ttl * revenue) * sales_on_markdown_gm_perct)) if revenue else None
+            ),
+            "MD - Margin Rate Lift (bps)": safe_calc(
+                percentages["MD - Margin Rate Lift (bps)"][0], percentages["MD - Margin Rate Lift (bps)"][1],
+                lambda x: (((sales_on_markdown_sales_perct_ttl * revenue) * (sales_on_markdown_gm_perct + (x / 100))) - 
+                        ((sales_on_markdown_sales_perct_ttl * revenue) * sales_on_markdown_gm_perct)) if revenue else None
+            ),
+            "Efficiency Re-Investment": safe_calc(
+                percentages["Efficiency Re-Investment"][0], percentages["Efficiency Re-Investment"][1],
+                lambda x: (price_benefit_headfix - (price_benefit_headfix * 100 / (x + 100))) * salary_avg if salary_avg else None
+            )
+        }
+        final_results["benefits"]["pricing"] = pricing
+
+        # Calculate sums
+        final_results["sum"] = calculate_benefit_sums(final_results)
+
+        print(f"Final Results: {final_results}")
+        return final_results
 
 
 class AlphaVantageTool(BaseTool):
