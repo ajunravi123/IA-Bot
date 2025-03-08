@@ -868,4 +868,7 @@ h1, h4 {
     padding-top: 40px; /* Add space for toggle */
 }
 
+.thinking-spinner {
+    border-color: rgb(81, 116, 255) rgb(211 208 208) rgb(100 124 255) !important;
+}
 
