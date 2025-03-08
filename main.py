@@ -1,8 +1,7 @@
-# main.py
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from crewai import Crew, Process
+from crewai import Crew, Process, Agent, Task
 from agents import DataCollectorAgent, DataFormatterAgent, SummaryGeneratorAgent, BenefitCalculatorAgent
 from retrieval_agent import RetrievalAgent
 from tools import FinanceTools
@@ -11,21 +10,52 @@ import os
 import re
 import time
 from dotenv import load_dotenv
-from config import llm_client  # Import llm_client for question detection and response generation
-from crewai import Crew, Process, Agent, Task
+from config import llm_client
+import logging
+from logging.handlers import TimedRotatingFileHandler
+from datetime import datetime
 
+# Load environment variables
 load_dotenv()
 
+# Set up FastAPI app
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/logs", StaticFiles(directory="logs"), name="logs")
 templates = Jinja2Templates(directory="templates")
 
+# Initialize tools and agents
 finance_tools = FinanceTools()
-retrieval_agent = RetrievalAgent()  # Initialize the RetrievalAgent
-
+retrieval_agent = RetrievalAgent()
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
 
+# Configure logging
+log_dir = "logs"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
 
+# Custom function to generate daily filename
+def daily_log_filename():
+    return os.path.join(log_dir, datetime.now().strftime("%Y-%m-%d.log"))
+
+# Use TimedRotatingFileHandler with a base filename that will rotate
+log_handler = TimedRotatingFileHandler(
+    filename=daily_log_filename(),  # Initial filename, e.g., 2025-03-10.log
+    when="midnight",  # Rotate at midnight
+    interval=1,  # Rotate every 1 day
+    backupCount=30  # Keep logs for 30 days
+)
+log_handler.setFormatter(logging.Formatter(
+    "%(asctime)s - %(levelname)s - IP: %(ip)s - Browser: %(browser)s - RequestID: %(request_id)s - %(message)s"
+))
+log_handler.namer = lambda name: os.path.join(log_dir, datetime.fromtimestamp(os.path.getmtime(name)).strftime("%Y-%m-%d.log"))  # Ensure rotated files keep YYYY-MM-DD.log format
+log_handler.rotator = lambda src, dest: os.rename(src, dest)  # Simple rename on rotation
+
+logger = logging.getLogger("WebSocketLogger")
+logger.setLevel(logging.INFO)
+logger.addHandler(log_handler)
+
+# LLM Agent for text analysis
 llm_agent = Agent(
     role="Text Analyzer and Responder",
     goal="Analyze text and generate natural language responses",
@@ -36,6 +66,14 @@ llm_agent = Agent(
 
 @app.get("/")
 async def root(request: Request):
+    # Log the GET request to the root endpoint
+    client_ip = request.client.host
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    timestamp = datetime.now().isoformat()
+    logger.info(
+        "Root endpoint accessed",
+        extra={"ip": client_ip, "browser": user_agent, "request_id": "N/A"}
+    )
     return templates.TemplateResponse("index.html", {"request": request})
 
 def fix_json_string(json_str):
@@ -128,7 +166,7 @@ async def detect_question(text: str) -> dict:
         Text: {text}
     """
     task = Task(
-        description= my_desc,
+        description=my_desc,
         expected_output="A JSON string with 'is_question' (boolean) and 'company' (string or null)",
         agent=llm_agent
     )
@@ -138,10 +176,8 @@ async def detect_question(text: str) -> dict:
     raw_output = result.tasks_output[0].raw.strip()
     print(f"Raw LLM output for '{text}': {raw_output}")
     
-    # Clean the raw output by removing code block markers and extra whitespace
     cleaned_output = raw_output.replace('```json', '').replace('```', '').strip()
     
-    # Parse the cleaned JSON response
     try:
         output = json.loads(cleaned_output)
         return {
@@ -150,9 +186,6 @@ async def detect_question(text: str) -> dict:
         }
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Error parsing LLM output: {e}. Raw output: {raw_output}")
-        # Fallback: Minimal intent-based logic without hardcoded phrases
-        # Assume a question if the text ends with '?' or has a clear interrogative tone
-        # Assume a company if a proper noun follows a verb suggesting action
         words = text.split()
         is_question = text.strip().endswith("?") or len(words) > 1 and words[0].lower() in ["what", "how", "why", "when", "where", "who"]
         company = None
@@ -215,7 +248,6 @@ def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, lis
         result = crew.kickoff()
         return result.tasks_output[0].raw.strip()
 
-    # If no contexts or all contexts are empty, return fallback with empty sources
     if not contexts or all(not ctx["content"].strip() for ctx in contexts):
         return (generate_llm_fallback(query), [])  # No URLs for fallback
     
@@ -254,7 +286,7 @@ def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, lis
 
     # Step 2: Check if LLM found the context insufficient
     if response == 'INSUFFICIENT_CONTEXT':
-        return (generate_llm_fallback(query), [])  # No URLs if context is insufficient
+        return (generate_llm_fallback(query), [])
 
     # Return response with source URLs if LLM provided a meaningful answer
     return (response, source_urls)
@@ -264,9 +296,15 @@ def generate_retrieval_response(query: str, is_question: bool) -> tuple[str, lis
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    
+    # Get client IP and browser info from the WebSocket connection
+    client_ip = websocket.client.host if websocket.client else "Unknown"
+    user_agent = websocket.headers.get("User-Agent", "Unknown")
+    
     try:
         while True:
             data = await websocket.receive_text()
+            timestamp = datetime.now().isoformat()
             print(f"Raw input received: {data}")
             try:
                 data_dict = json.loads(data)
@@ -282,6 +320,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 auto_detect = False
                 current_mode = "smart_detect"
             print(f"Parsed Request ID: {request_id}, Input: {user_input}")
+            
+            # Log the incoming request
+            logger.info(
+                f"User input received: {user_input}, Ticker: {ticker}, Auto Detect: {auto_detect}, Mode: {current_mode}",
+                extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+            )
             
             # Send initial "thinking" with request_id
             await websocket.send_json({"type": "thinking", "request_id": request_id})
@@ -303,12 +347,16 @@ async def websocket_endpoint(websocket: WebSocket):
                             mached_tickers = retrieval_agent.get_top_ticker_matches(user_input)
                             if len(mached_tickers) > 0:
                                 await websocket.send_json({
-                                    "type": "confirm_ticker",  # Changed from "result" to "question_result"
+                                    "type": "confirm_ticker",
                                     "data": {
-                                        "mached_tickers":mached_tickers
+                                        "mached_tickers": mached_tickers
                                     },
                                     "request_id": request_id
                                 })
+                                logger.info(
+                                    f"Ticker matches found: {mached_tickers}",
+                                    extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                                )
                                 break
                     else:
                         user_input = user_input if auto_detect else ticker
@@ -317,16 +365,20 @@ async def websocket_endpoint(websocket: WebSocket):
                     if current_mode == "asking_about_ia" or (is_question and current_mode in ["asking_about_ia", "smart_detect"]):
                         # Handle as a retrieval-based query (questions or non-financial statements)
                         await send_agent_update(websocket, "RetrievalAgent", "Thinking", request_id)
-                        response = generate_retrieval_response(user_input, is_question)
+                        response, urls = generate_retrieval_response(user_input, is_question)
                         
                         await websocket.send_json({
                             "type": "question_result",
                             "data": {
-                                "matched_paragraphs": response[0],
-                                "urls": response[1]
+                                "matched_paragraphs": response,
+                                "urls": urls
                             },
                             "request_id": request_id
                         })
+                        logger.info(
+                            f"Question response sent: {response}, Sources: {urls}",
+                            extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                        )
                         break
                     else:
                         # Handle as financial data request with existing agents
@@ -359,6 +411,10 @@ async def websocket_endpoint(websocket: WebSocket):
                                     "content": collector_output,
                                     "request_id": request_id
                                 })
+                                logger.info(
+                                    f"Collector error: {collector_output}",
+                                    extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                                )
                                 break
                             json_match = re.search(r'\{.*\}', collector_output, re.DOTALL)
                             if json_match:
@@ -372,6 +428,10 @@ async def websocket_endpoint(websocket: WebSocket):
                                     "content": collector_output,
                                     "request_id": request_id
                                 })
+                                logger.info(
+                                    f"Collector non-JSON output: {collector_output}",
+                                    extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                                )
                                 break
                         else:
                             financial_data = collector_output
@@ -432,6 +492,10 @@ async def websocket_endpoint(websocket: WebSocket):
                             },
                             "request_id": request_id
                         })
+                        logger.info(
+                            f"Result sent - Financial Data: {financial_data}, Benefits: {benefits}, Summary: {summary}",
+                            extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                        )
                         break
                 
                 except (Exception, json.JSONDecodeError) as e:
@@ -442,20 +506,36 @@ async def websocket_endpoint(websocket: WebSocket):
                             "message": f"Failed after {MAX_RETRIES} attempts: {str(e)}",
                             "request_id": request_id
                         })
+                        logger.error(
+                            f"Failed after {MAX_RETRIES} attempts: {str(e)}",
+                            extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                        )
                     else:
                         await websocket.send_json({
                             "type": "message",
                             "content": f"Retry attempt {retries + 1}/{MAX_RETRIES} due to error: {str(e)}",
                             "request_id": request_id
                         })
+                        logger.warning(
+                            f"Retry attempt {retries + 1}/{MAX_RETRIES} due to error: {str(e)}",
+                            extra={"ip": client_ip, "browser": user_agent, "request_id": request_id}
+                        )
                         await websocket.send_json({"type": "thinking", "request_id": request_id})
                         time.sleep(2)
             
     except WebSocketDisconnect as e:
         print(f"WebSocket disconnected: {str(e)}")
+        logger.info(
+            "WebSocket disconnected",
+            extra={"ip": client_ip, "browser": user_agent, "request_id": "unknown"}
+        )
         await websocket.send_json({"type": "error", "message": "WebSocket connection closed", "request_id": "unknown"})
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
+        logger.error(
+            f"WebSocket error: {str(e)}",
+            extra={"ip": client_ip, "browser": user_agent, "request_id": "unknown"}
+        )
         await websocket.send_json({"type": "error", "message": str(e), "request_id": "unknown"})
     finally:
         await websocket.close()

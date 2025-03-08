@@ -476,7 +476,7 @@ h1, h4 {
     }
 
     #chat-messages {
-        height: 56vh; /* Increased height for phones */
+        height: 52vh; /* Increased height for phones */
         padding: 5px; /* Reduced padding for phones */
     }
 
